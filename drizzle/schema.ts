@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, float, json, decimal } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, timestamp, varchar, float, json } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -10,9 +10,6 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
 });
-
-export type User = typeof users.$inferSelect;
-export type InsertUser = typeof users.$inferInsert;
 
 export const backtestResults = mysqlTable("backtest_results", {
   id: int("id").autoincrement().primaryKey(),
@@ -31,9 +28,6 @@ export const backtestResults = mysqlTable("backtest_results", {
   trades: json("trades"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
-
-export type BacktestResult = typeof backtestResults.$inferSelect;
-export type InsertBacktestResult = typeof backtestResults.$inferInsert;
 
 export const aiConversations = mysqlTable("ai_conversations", {
   id: int("id").autoincrement().primaryKey(),

@@ -45,32 +45,67 @@ export function registerLocalAuthRoutes(app: Express): void {
       console.log(`[Auth] 嘗試註冊: ${email}`);
 
       if (!email || !password) {
+        console.warn("[Auth] 缺少必填欄位");
         return res.status(400).json({ error: "請輸入電子郵件和密碼" });
       }
       if (password.length < 6) {
+        console.warn("[Auth] 密碼過短");
         return res.status(400).json({ error: "密碼長度至少需要 6 位" });
       }
 
       const normalizedEmail = email.toLowerCase().trim();
+      console.log(`[Auth] 正規化後的 Email: ${normalizedEmail}`);
+
+      // 檢查是否已存在
       const existing = await getUserByEmail(normalizedEmail);
       if (existing) {
-        console.log(`[Auth] 註冊失敗: ${email} 已被佔用`);
+        console.log(`[Auth] 註冊失敗: ${normalizedEmail} 已被佔用`);
         return res.status(409).json({ error: "該電子郵件已被註冊" });
       }
 
+      // 雜湊密碼
+      console.log("[Auth] 開始雜湊密碼...");
       const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-      
+      console.log("[Auth] 密碼雜湊完成");
+
+      // 寫入資料庫
+      console.log("[Auth] 開始寫入資料庫...");
       try {
-        await createUser({ email: normalizedEmail, passwordHash, name: name?.trim() });
-        console.log(`[Auth] 資料庫寫入成功: ${email}`);
+        await createUser({ 
+          email: normalizedEmail, 
+          passwordHash, 
+          name: name?.trim() || null 
+        });
+        console.log(`[Auth] ✓ 資料庫寫入成功: ${normalizedEmail}`);
       } catch (dbErr: any) {
-        console.error("[Auth] 資料庫寫入錯誤:", dbErr);
-        return res.status(500).json({ error: `資料庫寫入失敗: ${dbErr.message}` });
+        console.error("[Auth] ✗ 資料庫寫入失敗");
+        console.error("[Auth] 錯誤詳情:", dbErr);
+        console.error("[Auth] 錯誤訊息:", dbErr.message);
+        console.error("[Auth] 錯誤代碼:", dbErr.code);
+        console.error("[Auth] SQL 狀態:", dbErr.sqlState);
+        
+        // 回傳詳細的錯誤訊息供前端診斷
+        return res.status(500).json({ 
+          error: `資料庫寫入失敗: ${dbErr.message}`,
+          details: {
+            code: dbErr.code,
+            sqlState: dbErr.sqlState,
+            message: dbErr.message,
+          }
+        });
       }
 
+      // 驗證用戶是否真的被建立
+      console.log("[Auth] 驗證用戶是否已建立...");
       const user = await getUserByEmail(normalizedEmail);
-      if (!user) throw new Error("用戶建立後無法獲取");
+      if (!user) {
+        console.error("[Auth] ✗ 用戶建立後無法獲取");
+        return res.status(500).json({ error: "用戶建立後無法驗證" });
+      }
+      console.log(`[Auth] ✓ 用戶驗證成功，ID: ${user.id}`);
 
+      // 建立 Session Token
+      console.log("[Auth] 建立 Session Token...");
       const token = await createSessionToken(user.id);
       const cookieOpts = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, token, {
@@ -78,34 +113,45 @@ export function registerLocalAuthRoutes(app: Express): void {
         maxAge: 365 * 24 * 60 * 60 * 1000,
       });
 
-      return res.json({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
+      console.log(`[Auth] ✓ 註冊成功: ${normalizedEmail}`);
+      return res.status(201).json({ 
+        success: true,
+        user: { id: user.id, email: user.email, name: user.name } 
       });
     } catch (err: any) {
-      console.error("[Auth] 註冊過程發生嚴重錯誤:", err);
-      return res.status(500).json({ error: `註冊失敗: ${err.message}` });
+      console.error("[Auth] 未預期的錯誤:", err);
+      return res.status(500).json({ 
+        error: "伺服器內部錯誤",
+        details: err.message 
+      });
     }
   });
 
   // ── Login ─────────────────────────────────────────────────────────────────
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
-      const { email, password } = req.body as { email?: string; password?: string };
+      const { email, password } = req.body as {
+        email?: string;
+        password?: string;
+      };
+
+      console.log(`[Auth] 嘗試登入: ${email}`);
 
       if (!email || !password) {
         return res.status(400).json({ error: "請輸入電子郵件和密碼" });
       }
 
-      const user = await getUserByEmail(email.toLowerCase().trim());
+      const normalizedEmail = email.toLowerCase().trim();
+      const user = await getUserByEmail(normalizedEmail);
+
       if (!user) {
+        console.log(`[Auth] 登入失敗: ${normalizedEmail} 不存在`);
         return res.status(401).json({ error: "電子郵件或密碼錯誤" });
       }
 
-      const valid = await bcrypt.compare(password, user.passwordHash);
-      if (!valid) {
+      const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+      if (!passwordMatch) {
+        console.log(`[Auth] 登入失敗: ${normalizedEmail} 密碼不符`);
         return res.status(401).json({ error: "電子郵件或密碼錯誤" });
       }
 
@@ -118,47 +164,46 @@ export function registerLocalAuthRoutes(app: Express): void {
         maxAge: 365 * 24 * 60 * 60 * 1000,
       });
 
-      return res.json({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
+      console.log(`[Auth] ✓ 登入成功: ${normalizedEmail}`);
+      return res.status(200).json({ 
+        success: true,
+        user: { id: user.id, email: user.email, name: user.name } 
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("[Auth] 登入錯誤:", err);
-      return res.status(500).json({ error: "登入失敗" });
+      return res.status(500).json({ error: "伺服器內部錯誤" });
     }
   });
 
   // ── Logout ────────────────────────────────────────────────────────────────
   app.post("/api/auth/logout", (req: Request, res: Response) => {
-    const cookieOpts = getSessionCookieOptions(req);
-    res.clearCookie(COOKIE_NAME, { ...cookieOpts, maxAge: -1 });
-    return res.json({ success: true });
+    res.clearCookie(COOKIE_NAME);
+    return res.status(200).json({ success: true });
   });
 
-  // ── Me ────────────────────────────────────────────────────────────────────
+  // ── Get Current User ──────────────────────────────────────────────────────
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     try {
       const cookies = parseCookieHeader(req.headers.cookie ?? "");
       const token = cookies[COOKIE_NAME];
-      if (!token) return res.json(null);
 
-      const { payload } = await jwtVerify(token, getJwtSecret(), { algorithms: ["HS256"] });
-      const userId = payload.sub ? parseInt(payload.sub, 10) : null;
-      if (!userId || isNaN(userId)) return res.json(null);
+      if (!token) {
+        return res.status(401).json({ error: "未登入" });
+      }
+
+      const secret = getJwtSecret();
+      const verified = await jwtVerify(token, secret);
+      const userId = Number(verified.payload.sub);
 
       const user = await getUserById(userId);
-      if (!user) return res.json(null);
+      if (!user) {
+        return res.status(401).json({ error: "用戶不存在" });
+      }
 
-      return res.json({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      });
-    } catch {
-      return res.json(null);
+      return res.status(200).json({ user });
+    } catch (err: any) {
+      console.error("[Auth] 驗證 Token 失敗:", err.message);
+      return res.status(401).json({ error: "無效的 Token" });
     }
   });
 }
