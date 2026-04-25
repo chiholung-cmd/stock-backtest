@@ -3,40 +3,38 @@ import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { users, backtestResults, aiConversations } from "../drizzle/schema";
 
+let _pool: mysql.Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 
-export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+export async function getDbConnection() {
+  if (!_pool && process.env.DATABASE_URL) {
     try {
-      console.log("[Database] Initializing connection...");
+      console.log("[Database] Initializing connection pool...");
       
-      let connectionString = process.env.DATABASE_URL;
-      
-      // 移除原有的 ssl 參數，我們改用 pool 物件控制
+      const connectionString = process.env.DATABASE_URL;
       const url = new URL(connectionString.startsWith('mysql://') ? connectionString : `mysql://${connectionString}`);
       const cleanUri = `${url.protocol}//${url.username}:${url.password}@${url.host}${url.pathname}`;
 
-      const poolConnection = mysql.createPool({
+      _pool = mysql.createPool({
         uri: cleanUri,
         ssl: {
-          // 在 Render/TiDB Serverless 環境中，有時需要放寬驗證以成功握手
           rejectUnauthorized: false 
         },
         enableKeepAlive: true,
         connectionLimit: 5,
         waitForConnections: true,
         queueLimit: 0,
-        idleTimeout: 60000, // 1 minute
       });
 
-      _db = drizzle(poolConnection);
+      _db = drizzle(_pool);
       console.log("[Database] Connection pool created successfully.");
     } catch (error) {
       console.error("[Database] Initialization failed:", error);
+      _pool = null;
       _db = null;
     }
   }
-  return _db;
+  return { pool: _pool, db: _db };
 }
 
 // ─── User Auth ────────────────────────────────────────────────────────────────
@@ -46,25 +44,32 @@ export async function createUser(data: {
   passwordHash: string;
   name?: string;
 }): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  const { pool } = await getDbConnection();
+  if (!pool) throw new Error("Database pool not available");
 
   try {
-    // 極簡化寫入，僅傳遞最核心欄位，其餘交給資料庫 DEFAULT
-    await db.insert(users).values({
-      email: data.email.toLowerCase().trim(),
-      passwordHash: data.passwordHash,
-      name: data.name?.trim() || null,
-    });
+    // 使用最原始、最穩定的原生 SQL 插入語句，避開 ORM 的語法衝突
+    const sql = `
+      INSERT INTO users (email, password_hash, name, role) 
+      VALUES (?, ?, ?, 'user')
+    `;
+    const params = [
+      data.email.toLowerCase().trim(),
+      data.passwordHash,
+      data.name?.trim() || null
+    ];
+    
+    console.log(`[Database] Executing native SQL insert for ${data.email}...`);
+    await pool.execute(sql, params);
+    console.log(`[Database] Native SQL insert successful.`);
   } catch (error: any) {
     console.error(`[Database] createUser failed for ${data.email}:`, error);
-    // 拋出原始錯誤以便超級日誌捕捉
     throw error;
   }
 }
 
 export async function getUserByEmail(email: string) {
-  const db = await getDb();
+  const { db } = await getDbConnection();
   if (!db) return undefined;
 
   try {
@@ -82,7 +87,7 @@ export async function getUserByEmail(email: string) {
 }
 
 export async function getUserById(id: number) {
-  const db = await getDb();
+  const { db } = await getDbConnection();
   if (!db) return undefined;
 
   try {
@@ -95,7 +100,7 @@ export async function getUserById(id: number) {
 }
 
 export async function updateLastSignedIn(id: number): Promise<void> {
-  const db = await getDb();
+  const { db } = await getDbConnection();
   if (!db) return;
   try {
     await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, id));
@@ -107,7 +112,7 @@ export async function updateLastSignedIn(id: number): Promise<void> {
 // ─── Backtest Results ─────────────────────────────────────────────────────────
 
 export async function saveBacktestResult(data: any): Promise<void> {
-  const db = await getDb();
+  const { db } = await getDbConnection();
   if (!db) throw new Error("Database not available");
 
   await db.insert(backtestResults).values({
@@ -128,7 +133,7 @@ export async function saveBacktestResult(data: any): Promise<void> {
 }
 
 export async function getBacktestResultsByUser(userId: number) {
-  const db = await getDb();
+  const { db } = await getDbConnection();
   if (!db) return [];
 
   return db
@@ -139,7 +144,7 @@ export async function getBacktestResultsByUser(userId: number) {
 }
 
 export async function getBacktestResultById(id: number) {
-  const db = await getDb();
+  const { db } = await getDbConnection();
   if (!db) return undefined;
 
   const result = await db
@@ -152,7 +157,7 @@ export async function getBacktestResultById(id: number) {
 }
 
 export async function deleteBacktestResult(id: number, userId: number): Promise<void> {
-  const db = await getDb();
+  const { db } = await getDbConnection();
   if (!db) throw new Error("Database not available");
 
   const existing = await getBacktestResultById(id);
@@ -166,7 +171,7 @@ export async function deleteBacktestResult(id: number, userId: number): Promise<
 // ─── AI Conversations ────────────────────────────────────────────────────────
 
 export async function saveAiConversation(userId: number, topic: string, messages: any[]) {
-  const db = await getDb();
+  const { db } = await getDbConnection();
   if (!db) throw new Error("Database not available");
 
   await db.insert(aiConversations).values({
@@ -177,7 +182,7 @@ export async function saveAiConversation(userId: number, topic: string, messages
 }
 
 export async function getAiConversationsByUser(userId: number) {
-  const db = await getDb();
+  const { db } = await getDbConnection();
   if (!db) return [];
 
   return db
