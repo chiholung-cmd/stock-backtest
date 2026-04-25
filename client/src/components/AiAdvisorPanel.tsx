@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Send, Sparkles } from "lucide-react";
-import { trpc } from "@/_core/trpc";
+import { trpc } from "@/lib/trpc";
 
 interface Message {
   role: "user" | "assistant";
