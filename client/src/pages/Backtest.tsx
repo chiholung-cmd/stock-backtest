@@ -156,6 +156,10 @@ export default function Backtest() {
   const [endDate, setEndDate] = useState("");
   const [initialCapital, setInitialCapital] = useState(10000);
   const [currency, setCurrency] = useState("HKD");
+  const [contributeAmount, setContributeAmount] = useState(0);
+  const [contributePeriod, setContributePeriod] = useState("none");
+  const [redrawAmount, setRedrawAmount] = useState(0);
+  const [redrawPeriod, setRedrawPeriod] = useState("none");
 
   // Result state
   const [result, setResult] = useState<BacktestResult | null>(null);
@@ -223,6 +227,10 @@ export default function Backtest() {
       startDate,
       endDate,
       initialCapital,
+      contributeAmount: contributePeriod === "none" ? 0 : contributeAmount,
+      contributePeriod,
+      redrawAmount: redrawPeriod === "none" ? 0 : redrawAmount,
+      redrawPeriod,
     });
   };
 
@@ -373,6 +381,54 @@ export default function Backtest() {
                       onChange={e => setEndDate(e.target.value)}
                       className="h-10 rounded-xl bg-slate-50 border-slate-100 font-bold text-[10px]"
                     />
+                  </div>
+                </div>
+
+                {/* 定期定額 */}
+                <div className="space-y-3 pt-4 border-t border-slate-50">
+                  <Label className="text-[10px] font-black text-slate-400 uppercase">定期定額投入</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      type="number"
+                      placeholder="金額"
+                      value={contributeAmount || ""}
+                      onChange={e => setContributeAmount(Number(e.target.value) || 0)}
+                      className="h-9 rounded-lg bg-slate-50 border-slate-100 font-bold text-xs"
+                    />
+                    <select
+                      value={contributePeriod}
+                      onChange={e => setContributePeriod(e.target.value)}
+                      className="h-9 rounded-lg border border-slate-100 bg-slate-50 px-2 text-xs font-bold text-slate-700"
+                    >
+                      <option value="none">無</option>
+                      <option value="weekly">每週</option>
+                      <option value="monthly">每月</option>
+                      <option value="quarterly">每季</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 定期提領 */}
+                <div className="space-y-3 pt-3">
+                  <Label className="text-[10px] font-black text-slate-400 uppercase">定期提領</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      type="number"
+                      placeholder="金額"
+                      value={redrawAmount || ""}
+                      onChange={e => setRedrawAmount(Number(e.target.value) || 0)}
+                      className="h-9 rounded-lg bg-slate-50 border-slate-100 font-bold text-xs"
+                    />
+                    <select
+                      value={redrawPeriod}
+                      onChange={e => setRedrawPeriod(e.target.value)}
+                      className="h-9 rounded-lg border border-slate-100 bg-slate-50 px-2 text-xs font-bold text-slate-700"
+                    >
+                      <option value="none">無</option>
+                      <option value="weekly">每週</option>
+                      <option value="monthly">每月</option>
+                      <option value="quarterly">每季</option>
+                    </select>
                   </div>
                 </div>
               </div>

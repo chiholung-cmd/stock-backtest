@@ -10,8 +10,8 @@ export async function getDb() {
     try {
       console.log("[Database] Initializing connection...");
       
-      // 解析 DATABASE_URL 並確保包含 SSL 配置
       let connectionString = process.env.DATABASE_URL;
+      // 確保 SSL 配置正確
       if (connectionString.includes("tidbcloud.com") && !connectionString.includes("ssl=")) {
         const separator = connectionString.includes("?") ? "&" : "?";
         connectionString += `${separator}ssl={"rejectUnauthorized":true}`;
@@ -23,7 +23,7 @@ export async function getDb() {
           rejectUnauthorized: true
         },
         enableKeepAlive: true,
-        connectionLimit: 10,
+        connectionLimit: 5, // 減少連線數以適應 Serverless
       });
 
       _db = drizzle(poolConnection);
@@ -47,15 +47,17 @@ export async function createUser(data: {
   if (!db) throw new Error("Database not available");
 
   try {
+    // 顯式提供所有必填欄位，避免 TiDB 預設值衝突
     await db.insert(users).values({
-      email: data.email,
+      email: data.email.toLowerCase().trim(),
       passwordHash: data.passwordHash,
       name: data.name ?? null,
-      lastSignedIn: new Date(),
+      role: "user",
+      // 不傳遞 createdAt, updatedAt, lastSignedIn 讓資料庫使用 defaultNow()
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error(`[Database] createUser failed for ${data.email}:`, error);
-    throw error;
+    throw new Error(`資料庫寫入失敗: ${error.message}`);
   }
 }
 
