@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { StockSearchInput } from "@/components/StockSearchInput";
 import { TradeDetailsPanel } from "@/components/TradeDetailsPanel";
 import { AiDiagnosisPanel } from "@/components/AiDiagnosisPanel";
+import { StockComparisonPanel } from "@/components/StockComparisonPanel";
 import { toast } from "sonner";
 import {
   BarChart3, TrendingUp, TrendingDown, Zap, Activity,
@@ -474,6 +475,13 @@ export default function Backtest() {
                   策略回測
                 </TabsTrigger>
                 <TabsTrigger 
+                  value="comparison" 
+                  className="rounded-lg px-6 py-2.5 text-xs font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                >
+                  <TrendingUp size={14} className="mr-2" />
+                  對比分析
+                </TabsTrigger>
+                <TabsTrigger 
                   value="diagnosis" 
                   className="rounded-lg px-6 py-2.5 text-xs font-black uppercase tracking-widest data-[state=active]:bg-teal-600 data-[state=active]:text-white"
                 >
@@ -594,6 +602,10 @@ export default function Backtest() {
                 )}
               </div>
               )}
+              </TabsContent>
+
+              <TabsContent value="comparison" className="mt-0">
+                {result && <StockComparisonPanel data={result} />}
               </TabsContent>
 
               <TabsContent value="diagnosis" className="mt-0">
