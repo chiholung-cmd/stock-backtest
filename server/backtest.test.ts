@@ -31,27 +31,22 @@ vi.mock("./db", () => ({
   getDb: vi.fn().mockResolvedValue(null),
 }));
 
-// Mock execSync to avoid actual Python execution in tests
-vi.mock("child_process", () => ({
-  execSync: vi.fn().mockReturnValue(
-    JSON.stringify({
-      success: true,
-      data: {
-        ticker: "AAPL",
-        strategy: "ma_crossover",
-        strategyParams: { shortPeriod: 10, longPeriod: 30 },
-        startDate: "2023-01-01",
-        endDate: "2023-12-31",
-        annualizedReturn: 0.1507,
-        maxDrawdown: -0.1684,
-        sharpeRatio: 0.7348,
-        winRate: 0.5,
-        totalTrades: 4,
-        equityCurve: [{ date: "2023-01-03", value: 10000 }],
-        trades: [],
-      },
-    })
-  ),
+// Mock the TypeScript backtest engine to avoid actual Yahoo Finance calls
+vi.mock("./backtest", () => ({
+  runBacktest: vi.fn().mockResolvedValue({
+    ticker: "AAPL",
+    strategy: "ma_crossover",
+    strategyParams: { shortPeriod: 10, longPeriod: 30 },
+    startDate: "2023-01-01",
+    endDate: "2023-12-31",
+    annualizedReturn: 0.1507,
+    maxDrawdown: -0.1684,
+    sharpeRatio: 0.7348,
+    winRate: 0.5,
+    totalTrades: 4,
+    equityCurve: [{ date: "2023-01-03", value: 10000 }],
+    trades: [],
+  }),
 }));
 
 function createContext(user?: TrpcContext["user"]): TrpcContext {

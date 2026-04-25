@@ -50,4 +50,12 @@
 ## Phase 8: Testing & Delivery
 - [x] Write vitest tests for tRPC procedures (5 tests passing)
 - [x] Final UI polish and responsiveness check
-- [ ] Save checkpoint and deliver to user
+- [x] Save checkpoint and deliver to user
+
+## Bugfix: Python Not Found in Production
+- [x] Rewrite backtest engine in TypeScript (no Python dependency)
+- [x] Fetch Yahoo Finance data via HTTP API in Node.js (yahoo-finance2 v3)
+- [x] Implement MA Crossover, RSI, MACD, Bollinger Bands in TypeScript
+- [x] Update tRPC router to call TypeScript engine directly
+- [x] Update vitest tests for new engine
+- [x] Save checkpoint and redeploy

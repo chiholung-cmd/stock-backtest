@@ -1,7 +1,4 @@
 import { z } from "zod";
-import { execSync } from "child_process";
-import path from "path";
-import { fileURLToPath } from "url";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -12,79 +9,18 @@ import {
   getBacktestResultById,
   deleteBacktestResult,
 } from "./db";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { runBacktest } from "./backtest";
 
 // ─── Strategy param schemas ───────────────────────────────────────────────────
-
-const MACrossoverParams = z.object({
-  shortPeriod: z.number().min(2).max(200).default(10),
-  longPeriod: z.number().min(5).max(500).default(30),
-});
-
-const RSIParams = z.object({
-  period: z.number().min(2).max(100).default(14),
-  oversold: z.number().min(1).max(49).default(30),
-  overbought: z.number().min(51).max(99).default(70),
-});
-
-const MACDParams = z.object({
-  fastPeriod: z.number().min(2).max(100).default(12),
-  slowPeriod: z.number().min(5).max(200).default(26),
-  signalPeriod: z.number().min(2).max(50).default(9),
-});
-
-const BollingerBandsParams = z.object({
-  period: z.number().min(5).max(200).default(20),
-  stdDev: z.number().min(0.5).max(5).default(2),
-});
-
-const StrategyParamsSchema = z.union([
-  MACrossoverParams,
-  RSIParams,
-  MACDParams,
-  BollingerBandsParams,
-]);
 
 const RunBacktestInput = z.object({
   ticker: z.string().min(1).max(10).toUpperCase(),
   strategy: z.enum(["ma_crossover", "rsi", "macd", "bollinger_bands"]),
-  params: z.record(z.string(), z.any()),
+  params: z.record(z.string(), z.number()),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   saveResult: z.boolean().default(false),
 });
-
-// ─── Helper: run Python backtest engine ──────────────────────────────────────
-
-function runPythonBacktest(input: {
-  ticker: string;
-  strategy: string;
-  params: Record<string, string | number>;
-  startDate: string;
-  endDate: string;
-}) {
-  const enginePath = path.join(__dirname, "backtest_engine.py");
-  const inputJson = JSON.stringify(input);
-
-  try {
-    const output = execSync(`python3 "${enginePath}" '${inputJson.replace(/'/g, "'\\''")}'`, {
-      timeout: 60000,
-      maxBuffer: 10 * 1024 * 1024, // 10MB
-    }).toString();
-
-    const result = JSON.parse(output.trim());
-    if (!result.success) {
-      throw new Error(result.error || "Backtest failed");
-    }
-    return result.data;
-  } catch (err: unknown) {
-    if (err instanceof Error) {
-      throw new Error(`Backtest engine error: ${err.message}`);
-    }
-    throw new Error("Unknown backtest error");
-  }
-}
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
@@ -104,10 +40,10 @@ export const appRouter = router({
     run: publicProcedure
       .input(RunBacktestInput)
       .mutation(async ({ input, ctx }) => {
-        const result = await runPythonBacktest({
+        const result = await runBacktest({
           ticker: input.ticker,
           strategy: input.strategy,
-          params: input.params as Record<string, number>,
+          params: input.params,
           startDate: input.startDate,
           endDate: input.endDate,
         });
@@ -139,7 +75,7 @@ export const appRouter = router({
       .input(z.object({
         ticker: z.string(),
         strategy: z.string(),
-        strategyParams: z.record(z.string(), z.any()),
+        strategyParams: z.record(z.string(), z.number()),
         startDate: z.string(),
         endDate: z.string(),
         annualizedReturn: z.number().nullable(),
