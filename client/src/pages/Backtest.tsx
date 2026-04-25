@@ -33,7 +33,7 @@ interface BacktestResult {
   winRate: number;
   totalTrades: number;
   equityCurve: { date: string; value: number }[];
-  trades: { date: string; action: string; price: number; pnl: number | null }[];
+  trades: { date: string; action: string; price: number; amount: number; pnl: number | null; balance: number }[];
 }
 
 // ─── Strategy Definitions ─────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ const STRATEGIES = [
     id: "ma_crossover" as Strategy,
     name: "MA 交叉",
     description: "短期均線上穿長期均線買入，下穿賣出",
-    color: "oklch(0.52 0.18 195)",
+    color: "#0d9488",
     params: [
       { key: "shortPeriod", label: "短期 MA 週期", min: 2, max: 100, default: 10, step: 1 },
       { key: "longPeriod", label: "長期 MA 週期", min: 5, max: 300, default: 30, step: 1 },
@@ -53,7 +53,7 @@ const STRATEGIES = [
     id: "rsi" as Strategy,
     name: "RSI",
     description: "RSI 突破超賣區買入，突破超買區賣出",
-    color: "oklch(0.65 0.22 25)",
+    color: "#f59e0b",
     params: [
       { key: "period", label: "RSI 週期", min: 2, max: 50, default: 14, step: 1 },
       { key: "oversold", label: "超賣閾值", min: 10, max: 45, default: 30, step: 1 },
@@ -64,7 +64,7 @@ const STRATEGIES = [
     id: "macd" as Strategy,
     name: "MACD",
     description: "MACD 線上穿信號線買入，下穿賣出",
-    color: "oklch(0.58 0.2 260)",
+    color: "#3b82f6",
     params: [
       { key: "fastPeriod", label: "快線週期 (EMA)", min: 2, max: 50, default: 12, step: 1 },
       { key: "slowPeriod", label: "慢線週期 (EMA)", min: 5, max: 100, default: 26, step: 1 },
@@ -75,7 +75,7 @@ const STRATEGIES = [
     id: "bollinger_bands" as Strategy,
     name: "布林帶",
     description: "價格觸及下軌買入，觸及上軌賣出",
-    color: "oklch(0.52 0.18 150)",
+    color: "#8b5cf6",
     params: [
       { key: "period", label: "均線週期", min: 5, max: 100, default: 20, step: 1 },
       { key: "stdDev", label: "標準差倍數", min: 0.5, max: 4, default: 2, step: 0.1 },
@@ -102,37 +102,26 @@ function MetricCard({
   
   const formattedValue =
     value === null || value === undefined
-      ? "N/A"
+      ? "—"
       : format === "percent"
       ? (value * 100).toFixed(2) + "%"
       : format === "number"
       ? value.toString()
       : value.toFixed(2);
 
-  const displayColorClass = label === "最大回撤" 
-    ? "bg-rose-50 text-rose-600 border-rose-100" 
-    : isPositive 
-    ? "bg-teal-50 text-teal-600 border-teal-100" 
-    : "bg-slate-50 text-slate-600 border-slate-100";
-
-  const textColorClass = label === "最大回撤"
-    ? "text-rose-700"
-    : isPositive
-    ? "text-teal-700"
-    : "text-slate-700";
+  const isDrawdown = label === "最大回撤";
+  const colorClass = isDrawdown ? "text-rose-600" : isPositive ? "text-teal-600" : "text-slate-900";
 
   return (
-    <div className={`rounded-3xl border p-6 shadow-sm transition-all hover:shadow-md bg-white`}>
-      <div className="flex items-center gap-3 mb-4">
-        <div className={`p-2.5 rounded-2xl ${displayColorClass}`}>
-          <Icon size={20} />
-        </div>
-        <span className="text-xs font-black text-slate-500 uppercase tracking-widest">{label}</span>
+    <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <Icon size={16} className="text-slate-400" />
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</span>
       </div>
-      <div className={`text-3xl font-black tracking-tight ${textColorClass}`}>
+      <div className={`text-2xl font-black tracking-tight ${colorClass}`}>
         {formattedValue}
       </div>
-      <p className="text-xs text-slate-400 mt-3 font-bold leading-snug">{description}</p>
+      <p className="text-[10px] text-slate-400 mt-2 font-medium">{description}</p>
     </div>
   );
 }
@@ -142,7 +131,7 @@ function MetricCard({
 function TradingViewWidget({ ticker }: { ticker: string }) {
   const symbol = ticker.includes(":") ? ticker : ticker.includes(".HK") ? `HKEX:${ticker.replace(".HK", "")}` : `NASDAQ:${ticker}`;
   return (
-    <div className="w-full h-[420px] rounded-[2rem] overflow-hidden border border-slate-100 shadow-inner">
+    <div className="w-full h-[400px] rounded-xl overflow-hidden border border-slate-100">
       <iframe
         src={`https://www.tradingview.com/widgetembed/?frameElementId=tv_chart&symbol=${encodeURIComponent(symbol)}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=light&style=1&timezone=Asia%2FHong_Kong&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=zh_TW`}
         style={{ width: "100%", height: "100%", border: "none" }}
@@ -157,6 +146,7 @@ function TradingViewWidget({ ticker }: { ticker: string }) {
 
 export default function Backtest() {
   const { user, isAuthenticated } = useAuth();
+  const [, setLocation] = useState("");
   
   // Form state
   const [ticker, setTicker] = useState("AAPL");
@@ -164,12 +154,7 @@ export default function Backtest() {
   const [params, setParams] = useState<Record<string, number>>({});
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [timeframe, setTimeframe] = useState<"1d" | "1wk" | "1mo">("1d");
   const [initialCapital, setInitialCapital] = useState(10000);
-  const [contributeAmount, setContributeAmount] = useState(0);
-  const [contributePeriod, setContributePeriod] = useState<"none" | "weekly" | "monthly" | "quarterly">("none");
-  const [redrawAmount, setRedrawAmount] = useState(0);
-  const [redrawPeriod, setRedrawPeriod] = useState<"none" | "weekly" | "monthly" | "quarterly">("none");
   const [currency, setCurrency] = useState("HKD");
 
   // Result state
@@ -237,12 +222,7 @@ export default function Backtest() {
       params,
       startDate,
       endDate,
-      timeframe,
       initialCapital,
-      contributeAmount,
-      contributePeriod,
-      redrawAmount,
-      redrawPeriod,
     });
   };
 
@@ -265,26 +245,41 @@ export default function Backtest() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12">
-        <div className="flex items-center gap-4 mb-8">
-          <Link href="/">
-            <Button variant="ghost" size="icon" className="rounded-full bg-white shadow-sm border border-slate-100">
-              <ArrowLeft size={20} />
+    <div className="min-h-screen bg-[#FDFDFD] pb-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+        <div className="flex items-center justify-between mb-10">
+          <div className="flex items-center gap-4">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="rounded-xl bg-white border border-slate-100 shadow-sm">
+                <ArrowLeft size={18} />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">策略回測驗證</h1>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Backtest Engine v2.0</p>
+            </div>
+          </div>
+          
+          {result && isAuthenticated && (
+            <Button
+              onClick={handleSave}
+              disabled={isSaved || saveMutation.isPending}
+              variant="outline"
+              className="rounded-xl gap-2 font-bold text-xs"
+            >
+              <Save size={14} />
+              {isSaved ? "已儲存" : "儲存結果"}
             </Button>
-          </Link>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">策略回測驗證</h1>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* ─── Left Panel: Config ─── */}
           <div className="lg:col-span-4 space-y-6">
-            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-8">
+            <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm space-y-8">
               {/* Stock Search */}
               <div className="space-y-3">
-                <Label className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <Globe size={16} className="text-teal-600" /> 選擇股票標的
-                </Label>
+                <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">股票標的</Label>
                 <StockSearchInput 
                   value={ticker} 
                   onSelect={setTicker} 
@@ -294,37 +289,33 @@ export default function Backtest() {
 
               {/* Strategy Select */}
               <div className="space-y-3">
-                <Label className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <Zap size={16} className="text-amber-500" /> 選擇交易策略
-                </Label>
-                <div className="grid grid-cols-2 gap-2">
+                <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">交易策略</Label>
+                <div className="grid grid-cols-1 gap-2">
                   {STRATEGIES.map(s => (
                     <button
                       key={s.id}
                       onClick={() => setStrategy(s.id)}
-                      className={`px-4 py-3 rounded-2xl text-xs font-bold transition-all border ${
+                      className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all border ${
                         strategy === s.id 
                         ? "bg-slate-900 text-white border-slate-900 shadow-md" 
                         : "bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100"
                       }`}
                     >
                       {s.name}
+                      {strategy === s.id && <Zap size={14} className="text-amber-400 fill-amber-400" />}
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Strategy Params */}
-              <div className="space-y-4 pt-4 border-t border-slate-50">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-black text-slate-900">策略參數</Label>
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">CUSTOM</span>
-                </div>
+              <div className="space-y-5 pt-6 border-t border-slate-50">
+                <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">策略參數</Label>
                 {selectedStrategy.params.map(p => (
-                  <div key={p.key} className="space-y-2">
+                  <div key={p.key} className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <Label className="text-xs font-bold text-slate-500">{p.label}</Label>
-                      <span className="text-xs font-black text-teal-600">{params[p.key] || p.default}</span>
+                      <span className="text-xs font-bold text-slate-600">{p.label}</span>
+                      <span className="text-xs font-black text-teal-600 bg-teal-50 px-2 py-0.5 rounded-md">{params[p.key] || p.default}</span>
                     </div>
                     <input
                       type="range"
@@ -333,28 +324,24 @@ export default function Backtest() {
                       step={p.step}
                       value={params[p.key] || p.default}
                       onChange={e => setParams(prev => ({ ...prev, [p.key]: Number(e.target.value) }))}
-                      className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600"
+                      className="w-full h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600"
                     />
                   </div>
                 ))}
               </div>
 
-              {/* Money Management */}
-              <div className="space-y-4 pt-4 border-t border-slate-50">
-                <Label className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <Calculator size={16} className="text-blue-600" /> 資金管理設定
-                </Label>
-                <div className="grid grid-cols-2 gap-3">
+              {/* Settings */}
+              <div className="space-y-5 pt-6 border-t border-slate-50">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase">結算幣別</Label>
+                    <Label className="text-[10px] font-black text-slate-400 uppercase">幣別</Label>
                     <select
                       value={currency}
                       onChange={e => setCurrency(e.target.value)}
-                      className="w-full h-10 rounded-xl border border-slate-100 bg-slate-50 px-3 text-sm font-bold text-slate-700"
+                      className="w-full h-10 rounded-xl border border-slate-100 bg-slate-50 px-3 text-xs font-bold text-slate-700 focus:outline-none"
                     >
-                      <option value="HKD">HKD (預設)</option>
+                      <option value="HKD">HKD</option>
                       <option value="USD">USD</option>
-                      <option value="CNY">CNY</option>
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -363,23 +350,19 @@ export default function Backtest() {
                       type="number"
                       value={initialCapital}
                       onChange={e => setInitialCapital(Number(e.target.value))}
-                      className="h-10 rounded-xl bg-slate-50 border-slate-100 font-bold"
+                      className="h-10 rounded-xl bg-slate-50 border-slate-100 font-bold text-xs"
                     />
                   </div>
                 </div>
-              </div>
-
-              {/* Time Range */}
-              <div className="space-y-4 pt-4 border-t border-slate-50">
-                <Label className="text-sm font-black text-slate-900">回測時間範圍</Label>
-                <div className="grid grid-cols-2 gap-3">
+                
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black text-slate-400 uppercase">開始日期</Label>
                     <Input
                       type="date"
                       value={startDate}
                       onChange={e => setStartDate(e.target.value)}
-                      className="h-10 rounded-xl bg-slate-50 border-slate-100 font-bold"
+                      className="h-10 rounded-xl bg-slate-50 border-slate-100 font-bold text-[10px]"
                     />
                   </div>
                   <div className="space-y-2">
@@ -388,55 +371,54 @@ export default function Backtest() {
                       type="date"
                       value={endDate}
                       onChange={e => setEndDate(e.target.value)}
-                      className="h-10 rounded-xl bg-slate-50 border-slate-100 font-bold"
+                      className="h-10 rounded-xl bg-slate-50 border-slate-100 font-bold text-[10px]"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Run Button */}
               <Button
                 onClick={handleRun}
                 disabled={runMutation.isPending}
-                className="w-full h-14 bg-gradient-to-r from-teal-600 to-blue-600 text-white font-black text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+                className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-xl transition-all shadow-md"
               >
-                {runMutation.isPending ? "正在執行..." : "執行回測驗證"}
+                {runMutation.isPending ? "運算中..." : "執行回測"}
               </Button>
             </div>
           </div>
 
           {/* ─── Right Panel: Results ─── */}
-          <div className="lg:col-span-8 space-y-8">
+          <div className="lg:col-span-8 space-y-6">
             {!result && !runMutation.isPending && (
-              <div className="bg-white rounded-[2.5rem] border border-slate-100 p-24 text-center shadow-sm">
-                <div className="w-20 h-20 rounded-3xl mx-auto mb-6 flex items-center justify-center bg-slate-50 text-slate-300">
-                  <BarChart3 size={40} />
+              <div className="bg-white rounded-3xl border border-slate-100 p-20 text-center shadow-sm">
+                <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-slate-50 text-slate-300">
+                  <BarChart3 size={32} />
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-3">準備就緒</h3>
-                <p className="text-slate-500 font-medium">在左側設定參數後點擊執行，AI 回測引擎將為您分析績效。</p>
+                <h3 className="text-xl font-black text-slate-900 mb-2">等待數據輸入</h3>
+                <p className="text-slate-400 text-xs font-medium">請在左側面板設定您的策略參數，系統將即時生成績效報告。</p>
               </div>
             )}
 
             {runMutation.isPending && (
-              <div className="bg-white rounded-[2.5rem] border border-slate-100 p-24 text-center shadow-sm">
-                <div className="w-20 h-20 rounded-3xl mx-auto mb-6 flex items-center justify-center bg-teal-50 text-teal-600 animate-pulse">
-                  <Activity size={40} />
+              <div className="bg-white rounded-3xl border border-slate-100 p-20 text-center shadow-sm">
+                <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-teal-50 text-teal-600 animate-pulse">
+                  <Activity size={32} />
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-3">正在計算策略績效</h3>
-                <p className="text-slate-500 font-medium">獲取 Yahoo Finance 歷史數據並模擬交易信號...</p>
+                <h3 className="text-xl font-black text-slate-900 mb-2">正在處理大數據</h3>
+                <p className="text-slate-400 text-xs font-medium">獲取歷史 K 線數據並模擬交易信號...</p>
               </div>
             )}
 
             {result && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
-                {/* Performance Metrics */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div className="space-y-6 animate-in fade-in duration-700">
+                {/* Metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <MetricCard
                     label="年化報酬率"
                     value={result.annualizedReturn}
                     format="percent"
                     icon={TrendingUp}
-                    description="以複利計算的平均年化回報"
+                    description="平均年度複利回報"
                   />
                   <MetricCard
                     label="最大回撤"
@@ -450,58 +432,53 @@ export default function Backtest() {
                     value={result.sharpeRatio}
                     format="ratio"
                     icon={Activity}
-                    description="風險調整後的報酬表現"
+                    description="風險回報比"
                   />
                   <MetricCard
                     label="勝率"
                     value={result.winRate}
                     format="percent"
                     icon={Zap}
-                    description="獲利交易佔總交易比例"
+                    description="獲利交易佔比"
                   />
                 </div>
 
-                {/* Charts */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-                  <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-xl font-black text-slate-900">資產增長曲線</h3>
-                    <div className="text-xs font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">
-                      {result.ticker} · {result.startDate} ~ {result.endDate}
-                    </div>
+                {/* Equity Curve */}
+                <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">資產增長曲線</h3>
+                    <span className="text-[10px] font-bold text-slate-400">{result.ticker} · {currency}</span>
                   </div>
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={250}>
                     <AreaChart data={result.equityCurve}>
                       <defs>
                         <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0d9488" stopOpacity={0.3}/>
+                          <stop offset="5%" stopColor="#0d9488" stopOpacity={0.15}/>
                           <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
                       <XAxis dataKey="date" hide />
                       <YAxis hide domain={['auto', 'auto']} />
                       <Tooltip 
-                        contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                        formatter={(val: number) => [`$${val.toFixed(2)}`, '資產淨值']}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '12px' }}
+                        formatter={(val: number) => [`${currency} ${val.toFixed(2)}`, '淨值']}
                       />
-                      <Area type="monotone" dataKey="value" stroke="#0d9488" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
+                      <Area type="monotone" dataKey="value" stroke="#0d9488" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
 
                 {/* TradingView */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-                  <h3 className="text-xl font-black text-slate-900 mb-6">TradingView 市場圖表</h3>
+                <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">市場圖表回顧</h3>
                   <TradingViewWidget ticker={result.ticker} />
                 </div>
 
                 {/* Trade Details */}
                 {result.trades && result.trades.length > 0 && (
                   <TradeDetailsPanel 
-                    trades={result.trades.map((t: any, idx: number) => ({
-                      ...t,
-                      balance: t.balance ?? (initialCapital + (t.pnl ?? 0))
-                    }))} 
+                    trades={result.trades} 
                     initialCapital={initialCapital}
                     currency={currency}
                   />

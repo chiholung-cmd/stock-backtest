@@ -30,7 +30,7 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) {
-      toast.error("Please enter email and password");
+      toast.error("請輸入電子郵件和密碼");
       return;
     }
     setLoading(true);
@@ -43,13 +43,13 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Login failed");
+        toast.error(data.error ?? "登入失敗");
         return;
       }
-      toast.success(`Welcome back, ${data.name ?? data.email}!`);
+      toast.success(`歡迎回來，${data.name ?? data.email}！`);
       navigate(getRedirectPath());
     } catch {
-      toast.error("Network error. Please try again.");
+      toast.error("網路錯誤，請稍後再試。");
     } finally {
       setLoading(false);
     }
@@ -58,15 +58,15 @@ export default function Login() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regEmail || !regPassword) {
-      toast.error("Email and password are required");
+      toast.error("請填寫電子郵件和密碼");
       return;
     }
     if (regPassword.length < 6) {
-      toast.error("Password must be at least 6 characters");
+      toast.error("密碼長度至少需要 6 位");
       return;
     }
     if (regPassword !== regConfirm) {
-      toast.error("Passwords do not match");
+      toast.error("兩次輸入的密碼不一致");
       return;
     }
     setLoading(true);
@@ -79,13 +79,13 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Registration failed");
+        toast.error(data.error ?? "註冊失敗");
         return;
       }
-      toast.success(`Account created! Welcome, ${data.name ?? data.email}!`);
+      toast.success(`帳號已建立！歡迎，${data.name ?? data.email}！`);
       navigate(getRedirectPath());
     } catch {
-      toast.error("Network error. Please try again.");
+      toast.error("網路錯誤，請稍後再試。");
     } finally {
       setLoading(false);
     }
@@ -110,26 +110,26 @@ export default function Login() {
             </div>
             <span className="text-2xl font-black tracking-tight text-foreground">AlphaTest</span>
           </div>
-          <p className="text-muted-foreground text-sm">US Stock Strategy Backtesting Platform</p>
+          <p className="text-muted-foreground text-sm">全球股票策略回測平台</p>
         </div>
 
         <Card className="border border-border/60 shadow-lg bg-card/80 backdrop-blur-sm">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-bold">Get Started</CardTitle>
-            <CardDescription>Sign in to save and compare your backtest results</CardDescription>
+            <CardTitle className="text-xl font-bold">開始體驗</CardTitle>
+            <CardDescription>登入帳號以儲存並比較您的回測結果</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="login">
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="login">Sign In</TabsTrigger>
-                <TabsTrigger value="register">Register</TabsTrigger>
+                <TabsTrigger value="login">登入</TabsTrigger>
+                <TabsTrigger value="register">註冊</TabsTrigger>
               </TabsList>
 
               {/* Login Tab */}
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="login-email">電子郵件</Label>
                     <Input
                       id="login-email"
                       type="email"
@@ -141,7 +141,7 @@ export default function Login() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
+                    <Label htmlFor="login-password">密碼</Label>
                     <Input
                       id="login-password"
                       type="password"
@@ -153,7 +153,7 @@ export default function Login() {
                     />
                   </div>
                   <Button type="submit" className="w-full bg-teal-500 hover:bg-teal-600 text-white font-semibold" disabled={loading}>
-                    {loading ? "Signing in..." : "Sign In"}
+                    {loading ? "登入中..." : "立即登入"}
                   </Button>
                 </form>
               </TabsContent>
@@ -162,11 +162,11 @@ export default function Login() {
               <TabsContent value="register">
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="reg-name">Display Name <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                    <Label htmlFor="reg-name">顯示名稱 <span className="text-muted-foreground text-xs">(選填)</span></Label>
                     <Input
                       id="reg-name"
                       type="text"
-                      placeholder="John Doe"
+                      placeholder="例如：小明"
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
                       disabled={loading}
@@ -174,7 +174,7 @@ export default function Login() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="reg-email">Email</Label>
+                    <Label htmlFor="reg-email">電子郵件</Label>
                     <Input
                       id="reg-email"
                       type="email"
@@ -186,7 +186,7 @@ export default function Login() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="reg-password">Password <span className="text-muted-foreground text-xs">(min 6 chars)</span></Label>
+                    <Label htmlFor="reg-password">密碼 <span className="text-muted-foreground text-xs">(至少 6 位)</span></Label>
                     <Input
                       id="reg-password"
                       type="password"
@@ -198,7 +198,7 @@ export default function Login() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="reg-confirm">Confirm Password</Label>
+                    <Label htmlFor="reg-confirm">確認密碼</Label>
                     <Input
                       id="reg-confirm"
                       type="password"
@@ -210,7 +210,7 @@ export default function Login() {
                     />
                   </div>
                   <Button type="submit" className="w-full bg-teal-500 hover:bg-teal-600 text-white font-semibold" disabled={loading}>
-                    {loading ? "Creating account..." : "Create Account"}
+                    {loading ? "建立中..." : "建立帳號"}
                   </Button>
                 </form>
               </TabsContent>
@@ -218,19 +218,19 @@ export default function Login() {
 
             {/* Features hint */}
             <div className="mt-6 pt-5 border-t border-border/50">
-              <p className="text-xs text-muted-foreground text-center mb-3">What you get with an account</p>
+              <p className="text-xs text-muted-foreground text-center mb-3">會員專屬功能</p>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="flex flex-col items-center gap-1">
                   <BarChart2 className="w-4 h-4 text-teal-500" />
-                  <span className="text-xs text-muted-foreground">Save Results</span>
+                  <span className="text-xs text-muted-foreground">儲存結果</span>
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <Activity className="w-4 h-4 text-blue-500" />
-                  <span className="text-xs text-muted-foreground">Track History</span>
+                  <span className="text-xs text-muted-foreground">追蹤歷史</span>
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <TrendingUp className="w-4 h-4 text-coral-500" />
-                  <span className="text-xs text-muted-foreground">Compare Strategies</span>
+                  <span className="text-xs text-muted-foreground">比較策略</span>
                 </div>
               </div>
             </div>
@@ -238,7 +238,7 @@ export default function Login() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          You can also run backtests without an account — results just won't be saved.
+          您也可以在不登入的情況下進行回測，但結果將不會被儲存。
         </p>
       </div>
     </div>
