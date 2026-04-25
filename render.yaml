@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: stock-backtest
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: pnpm install && pnpm run build
+    startCommand: pnpm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false   # Set in Render dashboard: your MySQL/TiDB connection string
+      - key: JWT_SECRET
+        generateValue: true
+      - key: VITE_APP_ID
+        sync: false   # Set in Render dashboard
+      - key: OAUTH_SERVER_URL
+        sync: false   # Set in Render dashboard
+      - key: VITE_OAUTH_PORTAL_URL
+        sync: false   # Set in Render dashboard
+      - key: OWNER_OPEN_ID
+        sync: false   # Set in Render dashboard
+      - key: OWNER_NAME
+        sync: false   # Set in Render dashboard
+      - key: BUILT_IN_FORGE_API_URL
+        sync: false   # Optional: Manus built-in API URL
+      - key: BUILT_IN_FORGE_API_KEY
+        sync: false   # Optional: Manus built-in API key
