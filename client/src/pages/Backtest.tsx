@@ -167,32 +167,48 @@ export default function Backtest() {
 
   // 解析 URL 參數
   useEffect(() => {
-    const paramsObj = new URLSearchParams(window.location.search);
-    const tickerParam = paramsObj.get("ticker");
-    const strategyParam = paramsObj.get("strategy");
-    const strategyParamsJson = paramsObj.get("params");
+    try {
+      const paramsObj = new URLSearchParams(window.location.search);
+      const tickerParam = paramsObj.get("ticker");
+      const strategyParam = paramsObj.get("strategy");
+      const strategyParamsJson = paramsObj.get("params");
 
-    if (tickerParam) setTicker(tickerParam);
-    if (strategyParam) setStrategy(strategyParam as Strategy);
-    if (strategyParamsJson) {
-      try {
-        setParams(JSON.parse(strategyParamsJson));
-      } catch (e) {
-        console.error("Failed to parse strategy params from URL", e);
+      if (tickerParam) setTicker(tickerParam);
+      if (strategyParam && STRATEGIES.find(s => s.id === strategyParam)) {
+        setStrategy(strategyParam as Strategy);
       }
+      if (strategyParamsJson) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(strategyParamsJson));
+          if (parsed && typeof parsed === 'object') {
+            setParams(parsed);
+          }
+        } catch (e) {
+          console.error("Failed to parse strategy params from URL", e);
+          setParams({});
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing URL parameters", error);
     }
   }, []);
 
-  const selectedStrategy = STRATEGIES.find(s => s.id === strategy)!;
+  const selectedStrategy = STRATEGIES.find(s => s.id === strategy);
+  
+  if (!selectedStrategy) {
+    return <div className="p-4 text-red-600">策略未找到</div>;
+  }
 
   // Initialize params when strategy changes
   useEffect(() => {
     const newParams: Record<string, number> = {};
-    selectedStrategy.params.forEach(p => {
-      newParams[p.key] = params[p.key] ?? p.default;
-    });
+    if (selectedStrategy && selectedStrategy.params) {
+      selectedStrategy.params.forEach(p => {
+        newParams[p.key] = params[p.key] ?? p.default;
+      });
+    }
     setParams(newParams);
-  }, [strategy]);
+  }, [strategy, selectedStrategy]);
 
   const runMutation = trpc.backtest.run.useMutation({
     onSuccess: (data) => {
