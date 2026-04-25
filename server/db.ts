@@ -48,22 +48,22 @@ export async function createUser(data: {
   if (!pool) throw new Error("Database pool not available");
 
   try {
-    // 使用最原始、最穩定的原生 SQL 插入語句，避開 ORM 的語法衝突
-    const sql = `
-      INSERT INTO users (email, password_hash, name, role) 
-      VALUES (?, ?, ?, 'user')
-    `;
+    // 採用極簡化的原生 SQL 插入語法
+    // 只指定我們確定的三個欄位，其餘欄位完全交給資料庫 DEFAULT
+    // 這樣可以徹底避開 ORM 自動生成的欄位列表衝突
+    const sql = "INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)";
     const params = [
       data.email.toLowerCase().trim(),
       data.passwordHash,
       data.name?.trim() || null
     ];
     
-    console.log(`[Database] Executing native SQL insert for ${data.email}...`);
+    console.log(`[Database] Executing minimal native SQL insert for ${data.email}...`);
     await pool.execute(sql, params);
-    console.log(`[Database] Native SQL insert successful.`);
+    console.log(`[Database] Minimal native SQL insert successful.`);
   } catch (error: any) {
     console.error(`[Database] createUser failed for ${data.email}:`, error);
+    // 拋出原始錯誤以便超級日誌捕捉
     throw error;
   }
 }
