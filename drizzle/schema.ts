@@ -2,10 +2,9 @@ import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, float, json } fro
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
-  email: varchar("email", { length: 320 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  name: varchar("name", { length: 100 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -23,15 +22,12 @@ export const backtestResults = mysqlTable("backtest_results", {
   strategyParams: json("strategyParams").notNull(),
   startDate: varchar("startDate", { length: 20 }).notNull(),
   endDate: varchar("endDate", { length: 20 }).notNull(),
-  // Performance metrics
   annualizedReturn: float("annualizedReturn"),
   maxDrawdown: float("maxDrawdown"),
   sharpeRatio: float("sharpeRatio"),
   winRate: float("winRate"),
   totalTrades: int("totalTrades"),
-  // Equity curve data (JSON array of {date, value})
   equityCurve: json("equityCurve"),
-  // Trade signals (JSON array of {date, action, price})
   trades: json("trades"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

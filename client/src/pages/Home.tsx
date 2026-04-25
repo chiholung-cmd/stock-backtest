@@ -1,5 +1,4 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { ArrowRight, BarChart3, TrendingUp, Zap, History, GitCompare } from "lucide-react";
@@ -190,11 +189,11 @@ export default function Home() {
                 </Link>
               </div>
             ) : (
-              <a href={getLoginUrl()}>
+              <Link href="/login">
                 <Button size="sm" style={{ background: "oklch(0.52 0.18 195)" }} className="text-white hover:opacity-90">
                   登入
                 </Button>
-              </a>
+              </Link>
             )}
           </div>
         </div>

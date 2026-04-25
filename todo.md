@@ -59,3 +59,17 @@
 - [x] Update tRPC router to call TypeScript engine directly
 - [x] Update vitest tests for new engine
 - [x] Save checkpoint and redeploy
+
+## Refactor: Replace Manus OAuth with Local JWT Auth
+- [x] Install bcrypt for password hashing
+- [x] Update drizzle schema: add email/password fields to users table
+- [x] Run DB migration for new user fields
+- [x] Build backend auth routes: register, login, logout (JWT cookie)
+- [x] Remove Manus OAuth callback route and dependencies
+- [x] Update tRPC auth router (remove me/logout Manus-specific logic)
+- [x] Build frontend Login/Register page
+- [x] Update useAuth hook to use local JWT
+- [x] Remove Manus OAuth links/buttons from UI
+- [x] Update render.yaml env vars (remove Manus-specific ones)
+- [x] Update README deployment instructions
+- [ ] Run tests, push to GitHub, save checkpoint

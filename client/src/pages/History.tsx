@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -68,12 +67,12 @@ export default function History() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">請先登入</h2>
           <p className="text-sm text-gray-400 mb-6">登入後即可儲存並查看回測歷史記錄</p>
-          <a href={getLoginUrl()}>
+          <Link href="/login">
             <Button className="text-white gap-2" style={{ background: "oklch(0.52 0.18 195)" }}>
               <LogIn size={16} />
               立即登入
             </Button>
-          </a>
+          </Link>
         </div>
       </div>
     );

@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -391,9 +390,9 @@ export default function Backtest() {
             <Link href="/history" className="text-sm text-gray-500 hover:text-gray-900">歷史記錄</Link>
             <Link href="/compare" className="text-sm text-gray-500 hover:text-gray-900">比較分析</Link>
             {!isAuthenticated && (
-              <a href={getLoginUrl()}>
+              <Link href="/login">
                 <Button size="sm" variant="outline" className="text-xs">登入以儲存結果</Button>
-              </a>
+              </Link>
             )}
           </div>
         </div>

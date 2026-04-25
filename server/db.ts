@@ -1,7 +1,6 @@
-import { eq, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, backtestResults, InsertBacktestResult } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { users, backtestResults, InsertUser, InsertBacktestResult } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -17,96 +16,121 @@ export async function getDb() {
   return _db;
 }
 
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
+// ─── User Auth ────────────────────────────────────────────────────────────────
 
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
-  }
-
-  try {
-    const values: InsertUser = { openId: user.openId };
-    const updateSet: Record<string, unknown> = {};
-
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
-    }
-
-    if (!values.lastSignedIn) values.lastSignedIn = new Date();
-    if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
-  }
-}
-
-export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return result.length > 0 ? result[0] : undefined;
-}
-
-// ─── Backtest Result Helpers ─────────────────────────────────────────────────
-
-export async function saveBacktestResult(data: InsertBacktestResult) {
+export async function createUser(data: {
+  email: string;
+  passwordHash: string;
+  name?: string;
+}): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(backtestResults).values(data);
-  return result;
+
+  await db.insert(users).values({
+    email: data.email,
+    passwordHash: data.passwordHash,
+    name: data.name ?? null,
+    lastSignedIn: new Date(),
+  });
+}
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email.toLowerCase()))
+    .limit(1);
+
+  return result[0] ?? undefined;
+}
+
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result[0] ?? undefined;
+}
+
+export async function updateLastSignedIn(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, id));
+}
+
+// ─── Backtest Results ─────────────────────────────────────────────────────────
+
+export async function saveBacktestResult(data: {
+  userId: number;
+  ticker: string;
+  strategy: string;
+  strategyParams: Record<string, number>;
+  startDate: string;
+  endDate: string;
+  annualizedReturn?: number | null;
+  maxDrawdown?: number | null;
+  sharpeRatio?: number | null;
+  winRate?: number | null;
+  totalTrades?: number | null;
+  equityCurve?: unknown;
+  trades?: unknown;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(backtestResults).values({
+    userId: data.userId,
+    ticker: data.ticker,
+    strategy: data.strategy,
+    strategyParams: data.strategyParams,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    annualizedReturn: data.annualizedReturn ?? null,
+    maxDrawdown: data.maxDrawdown ?? null,
+    sharpeRatio: data.sharpeRatio ?? null,
+    winRate: data.winRate ?? null,
+    totalTrades: data.totalTrades ?? null,
+    equityCurve: data.equityCurve ?? [],
+    trades: data.trades ?? [],
+  });
 }
 
 export async function getBacktestResultsByUser(userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) return [];
+
   return db
     .select()
     .from(backtestResults)
     .where(eq(backtestResults.userId, userId))
-    .orderBy(desc(backtestResults.createdAt));
+    .orderBy(backtestResults.createdAt);
 }
 
 export async function getBacktestResultById(id: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.select().from(backtestResults).where(eq(backtestResults.id, id)).limit(1);
-  return result.length > 0 ? result[0] : null;
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(backtestResults)
+    .where(eq(backtestResults.id, id))
+    .limit(1);
+
+  return result[0] ?? undefined;
 }
 
-export async function deleteBacktestResult(id: number, userId: number) {
+export async function deleteBacktestResult(id: number, userId: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+
   // Verify ownership before deleting
-  const existing = await db.select().from(backtestResults).where(eq(backtestResults.id, id)).limit(1);
-  if (!existing[0] || existing[0].userId !== userId) {
-    throw new Error("Result not found or unauthorized");
+  const existing = await getBacktestResultById(id);
+  if (!existing || existing.userId !== userId) {
+    throw new Error("Result not found or access denied");
   }
-  return db.delete(backtestResults).where(eq(backtestResults.id, id));
+
+  await db.delete(backtestResults).where(eq(backtestResults.id, id));
 }
