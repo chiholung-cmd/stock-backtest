@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { users, backtestResults, InsertUser, InsertBacktestResult } from "../drizzle/schema";
+import { users, backtestResults, aiConversations, InsertUser, InsertBacktestResult } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -134,3 +134,28 @@ export async function deleteBacktestResult(id: number, userId: number): Promise<
 
   await db.delete(backtestResults).where(eq(backtestResults.id, id));
 }
+
+// ─── AI Conversations ────────────────────────────────────────────────────────
+
+export async function saveAiConversation(userId: number, topic: string, messages: any[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(aiConversations).values({
+    userId,
+    topic,
+    messages,
+  });
+}
+
+export async function getAiConversationsByUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select()
+    .from(aiConversations)
+    .where(eq(aiConversations.userId, userId))
+    .orderBy(aiConversations.createdAt);
+}
+

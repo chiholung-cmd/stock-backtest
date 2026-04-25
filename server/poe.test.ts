@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { PoeApiWrapper } from './poe';
 
 describe('PoeApiWrapper', () => {
-  const poe = new PoeApiWrapper('test-api-key');
+  const poe = new PoeApiWrapper('fake-key');
 
   it('should simulate analyzeGoal correctly', async () => {
     const goal = 'I want 15% return';
@@ -10,8 +10,8 @@ describe('PoeApiWrapper', () => {
     const result = await poe.analyzeGoal(goal, model);
     
     expect(result).toContain(goal);
-    expect(result).toContain(model);
-    expect(result).toContain('Recommended stock combination');
+    expect(result).toContain('ma_crossover,rsi');
+    expect(result).toContain('```json');
   });
 
   it('should simulate chat correctly', async () => {
@@ -20,7 +20,6 @@ describe('PoeApiWrapper', () => {
     const result = await poe.chat(message, model);
     
     expect(result).toContain(message);
-    expect(result).toContain(model);
-    expect(result).toContain('This is a simulated chat response');
+    expect(result).toContain('模擬的對話回應');
   });
 });

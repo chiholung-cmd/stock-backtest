@@ -10,7 +10,7 @@ import History from "./pages/History";
 import Compare from "./pages/Compare";
 import Login from "./pages/Login";
 import AiAdvisor from "./pages/AiAdvisor";
-import AiChatWidget from "./components/AiChatWidget";
+
 
 function Router() {
   return (
@@ -34,7 +34,6 @@ function App() {
         <TooltipProvider>
           <Toaster richColors position="top-right" />
           <Router />
-          <AiChatWidget />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

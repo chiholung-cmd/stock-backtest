@@ -1,10 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { StockSearchInput } from "@/components/StockSearchInput";
 import { toast } from "sonner";
 import {
   BarChart3, TrendingUp, TrendingDown, Zap, Activity,
@@ -284,10 +285,34 @@ export default function Backtest() {
   const [params, setParams] = useState<Record<string, number>>({});
   const [startDate, setStartDate] = useState("2022-01-01");
   const [endDate, setEndDate] = useState("2024-12-31");
+  const [timeframe, setTimeframe] = useState<"1d" | "1wk" | "1mo">("1d");
+  const [initialCapital, setInitialCapital] = useState(10000);
+  const [contributeAmount, setContributeAmount] = useState(0);
+  const [contributePeriod, setContributePeriod] = useState<"none" | "weekly" | "monthly" | "quarterly">("none");
+  const [redrawAmount, setRedrawAmount] = useState(0);
+  const [redrawPeriod, setRedrawPeriod] = useState<"none" | "weekly" | "monthly" | "quarterly">("none");
 
   // Result state
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+
+  // 解析 URL 參數 (來自 AI 顧問)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlTicker = params.get("ticker");
+    const urlStrategy = params.get("strategy");
+    const urlParams = params.get("params");
+
+    if (urlTicker) setTicker(urlTicker);
+    if (urlStrategy) setStrategy(urlStrategy as Strategy);
+    if (urlParams) {
+      try {
+        setParams(JSON.parse(urlParams));
+      } catch (e) {
+        console.error("Failed to parse URL params", e);
+      }
+    }
+  }, []);
 
   const selectedStrategy = STRATEGIES.find(s => s.id === strategy)!;
 
@@ -346,6 +371,12 @@ export default function Backtest() {
       params: buildParams(),
       startDate,
       endDate,
+      timeframe,
+      initialCapital,
+      contributeAmount,
+      contributePeriod,
+      redrawAmount,
+      redrawPeriod,
       saveResult: false,
     });
   };
@@ -412,14 +443,76 @@ export default function Backtest() {
                 </div>
                 股票代碼
               </h2>
-              <Input
+              <StockSearchInput
                 value={ticker}
-                onChange={e => setTicker(e.target.value.toUpperCase())}
-                placeholder="輸入美股代碼，如 AAPL"
-                className="font-mono text-lg font-bold tracking-widest h-12 text-center uppercase"
-                maxLength={10}
+                onChange={setTicker}
+                onSelect={setTicker}
+                placeholder="輸入股票代碼或名稱"
               />
               <p className="text-xs text-gray-400 mt-2 text-center">支援美股市場所有標的</p>
+            </div>
+
+            {/* Timeframe & Capital */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
+              <h2 className="text-base font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "oklch(0.52 0.18 195 / 0.15)" }}>
+                  <Activity size={12} style={{ color: "oklch(0.52 0.18 195)" }} />
+                </div>
+                時間週期與資金管理
+              </h2>
+              
+              <div className="space-y-2">
+                <Label className="text-xs">時間週期</Label>
+                <div className="flex gap-2">
+                  {(["1d", "1wk", "1mo"] as const).map(tf => (
+                    <Button
+                      key={tf}
+                      size="sm"
+                      variant={timeframe === tf ? "default" : "outline"}
+                      onClick={() => setTimeframe(tf)}
+                      className="flex-1 text-xs"
+                    >
+                      {tf === "1d" ? "日線" : tf === "1wk" ? "週線" : "月線"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs">初始資金 ($)</Label>
+                <Input
+                  type="number"
+                  value={initialCapital}
+                  onChange={e => setInitialCapital(Number(e.target.value))}
+                  className="h-9"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">定期投入</Label>
+                  <Input
+                    type="number"
+                    value={contributeAmount}
+                    onChange={e => setContributeAmount(Number(e.target.value))}
+                    placeholder="金額"
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">投入頻率</Label>
+                  <select
+                    value={contributePeriod}
+                    onChange={e => setContributePeriod(e.target.value as any)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
+                  >
+                    <option value="none">無</option>
+                    <option value="weekly">每週</option>
+                    <option value="monthly">每月</option>
+                    <option value="quarterly">每季</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             {/* Strategy Selection */}

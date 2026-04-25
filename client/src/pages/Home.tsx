@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { ArrowRight, BarChart3, TrendingUp, Zap, History, GitCompare } from "lucide-react";
+import { AiAdvisorPanel } from "@/components/AiAdvisorPanel";
 
 // ─── Isometric SVG Decoration ─────────────────────────────────────────────────
 
@@ -272,6 +273,17 @@ export default function Home() {
         </div>
       </section>
 
+      {/* AI Advisor Section */}
+      <section className="py-20 bg-gradient-to-b from-teal-50 to-white">
+        <div className="container">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-extrabold text-gray-900 mb-3">AI 智能投資顧問</h2>
+            <p className="text-gray-500 text-lg">由先進 AI 模型驅動，為您量身打造投資策略</p>
+          </div>
+          <AiAdvisorPanel />
+        </div>
+      </section>
+
       {/* Features Grid */}
       <section className="py-20">
         <div className="container">
@@ -321,20 +333,32 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 border-t border-gray-100">
+      <section className="py-16 border-t border-gray-100 bg-gray-50">
         <div className="container text-center">
           <h2 className="text-3xl font-extrabold text-gray-900 mb-4">準備好開始了嗎？</h2>
-          <p className="text-gray-500 mb-8 text-lg">輸入股票代碼，選擇策略，立即執行回測</p>
-          <Link href="/backtest">
-            <Button
-              size="lg"
-              className="text-white font-semibold px-10 gap-2"
-              style={{ background: "oklch(0.52 0.18 195)" }}
-            >
-              開始回測
-              <ArrowRight size={18} />
-            </Button>
-          </Link>
+          <p className="text-gray-500 mb-8 text-lg">與 AI 顧問一起探索最適合您的投資策略</p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/backtest">
+              <Button
+                size="lg"
+                className="text-white font-semibold px-10 gap-2"
+                style={{ background: "oklch(0.52 0.18 195)" }}
+              >
+                立即開始回測
+                <ArrowRight size={18} />
+              </Button>
+            </Link>
+            <Link href="/ai-advisor">
+              <Button
+                size="lg"
+                variant="outline"
+                className="font-semibold px-10 gap-2"
+              >
+                查看更多 AI 功能
+                <ArrowRight size={18} />
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 

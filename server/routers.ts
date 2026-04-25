@@ -18,10 +18,16 @@ const poe = new PoeApiWrapper(process.env.POE_API_KEY || "");
 
 const RunBacktestInput = z.object({
   ticker: z.string().min(1).max(10).toUpperCase(),
-  strategy: z.enum(["ma_crossover", "rsi", "macd", "bollinger_bands"]),
+  strategy: z.string(),
   params: z.record(z.string(), z.number()),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  timeframe: z.enum(["1d", "1wk", "1mo"]).default("1d"),
+  initialCapital: z.number().default(10000),
+  contributeAmount: z.number().default(0),
+  contributePeriod: z.enum(["none", "weekly", "monthly", "quarterly"]).default("none"),
+  redrawAmount: z.number().default(0),
+  redrawPeriod: z.enum(["none", "weekly", "monthly", "quarterly"]).default("none"),
   saveResult: z.boolean().default(false),
 });
 
@@ -40,12 +46,17 @@ export const appRouter = router({
       }),
     chat: protectedProcedure
       .input(z.object({
-        message: z.string().min(1),
+        messages: z.array(z.object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string(),
+        })),
         model: z.string().min(1),
       }))
       .mutation(async ({ input }) => {
-        const response = await poe.chat(input.message, input.model);
-        return { response };
+        // Use the last message as the query for now, or join them
+        const lastMessage = input.messages[input.messages.length - 1].content;
+        const response = await poe.chat(lastMessage, input.model);
+        return { reply: response };
       }),
   }),
   system: systemRouter,
@@ -59,7 +70,6 @@ export const appRouter = router({
   }),
 
   backtest: router({
-    // Run a backtest (optionally save if authenticated)
     run: publicProcedure
       .input(RunBacktestInput)
       .mutation(async ({ input, ctx }) => {
@@ -69,31 +79,24 @@ export const appRouter = router({
           params: input.params,
           startDate: input.startDate,
           endDate: input.endDate,
+          timeframe: input.timeframe,
+          initialCapital: input.initialCapital,
+          contributeAmount: input.contributeAmount,
+          contributePeriod: input.contributePeriod,
+          redrawAmount: input.redrawAmount,
+          redrawPeriod: input.redrawPeriod,
         });
 
-        // Save to DB if user is logged in and saveResult is true
         if (input.saveResult && ctx.user) {
           await saveBacktestResult({
             userId: ctx.user.id,
-            ticker: result.ticker,
-            strategy: result.strategy,
-            strategyParams: result.strategyParams,
-            startDate: result.startDate,
-            endDate: result.endDate,
-            annualizedReturn: result.annualizedReturn,
-            maxDrawdown: result.maxDrawdown,
-            sharpeRatio: result.sharpeRatio,
-            winRate: result.winRate,
-            totalTrades: result.totalTrades,
-            equityCurve: result.equityCurve,
-            trades: result.trades,
+            ...result,
           });
         }
 
         return result;
       }),
 
-    // Save a completed backtest result
     save: protectedProcedure
       .input(z.object({
         ticker: z.string(),
@@ -117,12 +120,10 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // List all saved results for current user
     list: protectedProcedure.query(async ({ ctx }) => {
       return getBacktestResultsByUser(ctx.user.id);
     }),
 
-    // Get a single result by ID
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
@@ -133,7 +134,6 @@ export const appRouter = router({
         return result;
       }),
 
-    // Delete a result
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
