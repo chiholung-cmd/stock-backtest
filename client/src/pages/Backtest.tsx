@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StockSearchInput } from "@/components/StockSearchInput";
+import { TradeDetailsPanel } from "@/components/TradeDetailsPanel";
 import { toast } from "sonner";
 import {
   BarChart3, TrendingUp, TrendingDown, Zap, Activity,
@@ -493,6 +494,18 @@ export default function Backtest() {
                   <h3 className="text-xl font-black text-slate-900 mb-6">TradingView 市場圖表</h3>
                   <TradingViewWidget ticker={result.ticker} />
                 </div>
+
+                {/* Trade Details */}
+                {result.trades && result.trades.length > 0 && (
+                  <TradeDetailsPanel 
+                    trades={result.trades.map((t: any, idx: number) => ({
+                      ...t,
+                      balance: t.balance ?? (initialCapital + (t.pnl ?? 0))
+                    }))} 
+                    initialCapital={initialCapital}
+                    currency={currency}
+                  />
+                )}
               </div>
             )}
           </div>

@@ -1,15 +1,35 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { users, backtestResults, aiConversations, InsertUser, InsertBacktestResult } from "../drizzle/schema";
+import mysql from "mysql2/promise";
+import { users, backtestResults, aiConversations } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      console.log("[Database] Initializing connection...");
+      
+      // 解析 DATABASE_URL 並確保包含 SSL 配置
+      let connectionString = process.env.DATABASE_URL;
+      if (connectionString.includes("tidbcloud.com") && !connectionString.includes("ssl=")) {
+        const separator = connectionString.includes("?") ? "&" : "?";
+        connectionString += `${separator}ssl={"rejectUnauthorized":true}`;
+      }
+
+      const poolConnection = mysql.createPool({
+        uri: connectionString,
+        ssl: {
+          rejectUnauthorized: true
+        },
+        enableKeepAlive: true,
+        connectionLimit: 10,
+      });
+
+      _db = drizzle(poolConnection);
+      console.log("[Database] Connection pool created successfully.");
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.error("[Database] Initialization failed:", error);
       _db = null;
     }
   }
@@ -26,58 +46,63 @@ export async function createUser(data: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.insert(users).values({
-    email: data.email,
-    passwordHash: data.passwordHash,
-    name: data.name ?? null,
-    lastSignedIn: new Date(),
-  });
+  try {
+    await db.insert(users).values({
+      email: data.email,
+      passwordHash: data.passwordHash,
+      name: data.name ?? null,
+      lastSignedIn: new Date(),
+    });
+  } catch (error) {
+    console.error(`[Database] createUser failed for ${data.email}:`, error);
+    throw error;
+  }
 }
 
 export async function getUserByEmail(email: string) {
   const db = await getDb();
   if (!db) return undefined;
 
-  const result = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email.toLowerCase()))
-    .limit(1);
+  try {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email.toLowerCase().trim()))
+      .limit(1);
 
-  return result[0] ?? undefined;
+    return result[0] ?? undefined;
+  } catch (error) {
+    console.error(`[Database] getUserByEmail failed for ${email}:`, error);
+    return undefined;
+  }
 }
 
 export async function getUserById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
 
-  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-  return result[0] ?? undefined;
+  try {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0] ?? undefined;
+  } catch (error) {
+    console.error(`[Database] getUserById failed for ${id}:`, error);
+    return undefined;
+  }
 }
 
 export async function updateLastSignedIn(id: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, id));
+  try {
+    await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, id));
+  } catch (error) {
+    console.error(`[Database] updateLastSignedIn failed for ${id}:`, error);
+  }
 }
 
 // ─── Backtest Results ─────────────────────────────────────────────────────────
 
-export async function saveBacktestResult(data: {
-  userId: number;
-  ticker: string;
-  strategy: string;
-  strategyParams: Record<string, number>;
-  startDate: string;
-  endDate: string;
-  annualizedReturn?: number | null;
-  maxDrawdown?: number | null;
-  sharpeRatio?: number | null;
-  winRate?: number | null;
-  totalTrades?: number | null;
-  equityCurve?: unknown;
-  trades?: unknown;
-}): Promise<void> {
+export async function saveBacktestResult(data: any): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -126,7 +151,6 @@ export async function deleteBacktestResult(id: number, userId: number): Promise<
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Verify ownership before deleting
   const existing = await getBacktestResultById(id);
   if (!existing || existing.userId !== userId) {
     throw new Error("Result not found or access denied");
@@ -158,4 +182,3 @@ export async function getAiConversationsByUser(userId: number) {
     .where(eq(aiConversations.userId, userId))
     .orderBy(aiConversations.createdAt);
 }
-
