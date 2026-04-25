@@ -55,8 +55,17 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         // Use the last message as the query for now, or join them
         const lastMessage = input.messages[input.messages.length - 1].content;
-        const response = await poe.chat(lastMessage, input.model);
+        const response = await poe.chat(lastMessage, input.model, input.messages.slice(0, -1));
         return { reply: response };
+      }),
+    diagnose: protectedProcedure
+      .input(z.object({
+        ticker: z.string().min(1),
+        model: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await poe.diagnoseStock(input.ticker, input.model);
+        return { diagnosis: result };
       }),
   }),
   system: systemRouter,

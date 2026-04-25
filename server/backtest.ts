@@ -54,6 +54,7 @@ export interface BacktestOutput {
   winRate: number;
   totalTrades: number;
   equityCurve: EquityPoint[];
+  buyAndHoldCurve?: any[];
   trades: TradeRecord[];
 }
 
@@ -212,6 +213,19 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     equityCurve.push({ date, value: cash + shares * price });
   }
 
+  // Calculate Buy & Hold Curve for comparison
+  const buyAndHoldCurve = [];
+  if (data.length > 0) {
+    const firstPrice = data[0].close;
+    const initialShares = input.initialCapital / firstPrice;
+    for (const d of data) {
+      buyAndHoldCurve.push({
+        date: d.date,
+        buyHoldValue: initialShares * d.close
+      });
+    }
+  }
+
   // Close final position
   if (shares > 0) {
     const lastPrice = data[data.length - 1].close;
@@ -260,6 +274,7 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     winRate,
     totalTrades: completedTrades.length,
     equityCurve,
+    buyAndHoldCurve,
     trades,
   };
 }

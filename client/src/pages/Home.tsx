@@ -127,9 +127,9 @@ export default function Home() {
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
-            { title: "全球市場同步", desc: "支援美股、港股及全球主流市場數據，數據與 TradingView 即時同步。", icon: Globe, color: "teal" },
-            { title: "資金規劃助手", desc: "內建定期定額與提領模擬，完美規劃您的財富現金流。", icon: Calculator, color: "blue" },
-            { title: "多模型智慧", desc: "整合 Claude 3.5、GPT-4o 與 Gemini，提供最精準的投資視角。", icon: Zap, color: "orange" }
+            { title: "AI 市場情緒診斷", desc: "整合即時新聞，AI 自動判讀市場情緒與利多利空，給出精確評分。", icon: BrainCircuit, color: "teal" },
+            { title: "自然語言策略生成", desc: "直接用說的！AI 將您的投資想法轉化為可執行的量化策略參數。", icon: Sparkles, color: "blue" },
+            { title: "資金規劃助手", desc: "內建定期定額與提領模擬，完美規劃您的財富現金流。", icon: Calculator, color: "orange" }
           ].map((f, i) => (
             <div key={i} className="p-10 rounded-[2rem] bg-white border border-slate-100 hover:border-teal-200 hover:shadow-xl transition-all group">
               <div className={`w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform`}>

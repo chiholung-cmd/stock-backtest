@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StockSearchInput } from "@/components/StockSearchInput";
 import { TradeDetailsPanel } from "@/components/TradeDetailsPanel";
+import { AiDiagnosisPanel } from "@/components/AiDiagnosisPanel";
 import { toast } from "sonner";
 import {
   BarChart3, TrendingUp, TrendingDown, Zap, Activity,
-  Play, Save, ArrowLeft, Info, Globe, Calculator
+  Play, Save, ArrowLeft, Info, Globe, Calculator, BrainCircuit
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -33,6 +35,7 @@ interface BacktestResult {
   winRate: number;
   totalTrades: number;
   equityCurve: { date: string; value: number }[];
+  buyAndHoldCurve?: { date: string; value: number }[];
   trades: { date: string; action: string; price: number; amount: number; pnl: number | null; balance: number }[];
 }
 
@@ -461,28 +464,47 @@ export default function Backtest() {
 
           {/* ─── Right Panel: Results ─── */}
           <div className="lg:col-span-8 space-y-6">
-            {!result && !runMutation.isPending && (
-              <div className="bg-white rounded-3xl border border-slate-100 p-20 text-center shadow-sm">
-                <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-slate-50 text-slate-300">
-                  <BarChart3 size={32} />
-                </div>
-                <h3 className="text-xl font-black text-slate-900 mb-2">等待數據輸入</h3>
-                <p className="text-slate-400 text-xs font-medium">請在左側面板設定您的策略參數，系統將即時生成績效報告。</p>
-              </div>
-            )}
+            <Tabs defaultValue="backtest" className="w-full">
+              <TabsList className="bg-white border border-slate-100 rounded-xl p-1 mb-6 h-auto">
+                <TabsTrigger 
+                  value="backtest" 
+                  className="rounded-lg px-6 py-2.5 text-xs font-black uppercase tracking-widest data-[state=active]:bg-slate-900 data-[state=active]:text-white"
+                >
+                  <BarChart3 size={14} className="mr-2" />
+                  策略回測
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="diagnosis" 
+                  className="rounded-lg px-6 py-2.5 text-xs font-black uppercase tracking-widest data-[state=active]:bg-teal-600 data-[state=active]:text-white"
+                >
+                  <BrainCircuit size={14} className="mr-2" />
+                  AI 深度診斷
+                </TabsTrigger>
+              </TabsList>
 
-            {runMutation.isPending && (
-              <div className="bg-white rounded-3xl border border-slate-100 p-20 text-center shadow-sm">
-                <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-teal-50 text-teal-600 animate-pulse">
-                  <Activity size={32} />
-                </div>
-                <h3 className="text-xl font-black text-slate-900 mb-2">正在處理大數據</h3>
-                <p className="text-slate-400 text-xs font-medium">獲取歷史 K 線數據並模擬交易信號...</p>
-              </div>
-            )}
+              <TabsContent value="backtest" className="space-y-6 mt-0">
+                {!result && !runMutation.isPending && (
+                  <div className="bg-white rounded-3xl border border-slate-100 p-20 text-center shadow-sm">
+                    <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-slate-50 text-slate-300">
+                      <BarChart3 size={32} />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 mb-2">等待數據輸入</h3>
+                    <p className="text-slate-400 text-xs font-medium">請在左側面板設定您的策略參數，系統將即時生成績效報告。</p>
+                  </div>
+                )}
 
-            {result && (
-              <div className="space-y-6 animate-in fade-in duration-700">
+                {runMutation.isPending && (
+                  <div className="bg-white rounded-3xl border border-slate-100 p-20 text-center shadow-sm">
+                    <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-teal-50 text-teal-600 animate-pulse">
+                      <Activity size={32} />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 mb-2">正在處理大數據</h3>
+                    <p className="text-slate-400 text-xs font-medium">獲取歷史 K 線數據並模擬交易信號...</p>
+                  </div>
+                )}
+
+                {result && (
+                  <div className="space-y-6 animate-in fade-in duration-700">
                 {/* Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <MetricCard
@@ -536,9 +558,24 @@ export default function Backtest() {
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '12px' }}
                         formatter={(val: number) => [`${currency} ${val.toFixed(2)}`, '淨值']}
                       />
-                      <Area type="monotone" dataKey="value" stroke="#0d9488" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
+                      <Area type="monotone" dataKey="value" name="AI 策略" stroke="#0d9488" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
+                      {result.buyAndHoldCurve && (
+                        <Area type="monotone" dataKey="buyHoldValue" name="買入持有" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" fill="none" />
+                      )}
                     </AreaChart>
                   </ResponsiveContainer>
+                  {result.buyAndHoldCurve && (
+                    <div className="mt-4 flex items-center justify-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-teal-600" />
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">AI 策略績效</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">單純買入持有 (基準)</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* TradingView */}
@@ -556,7 +593,13 @@ export default function Backtest() {
                   />
                 )}
               </div>
-            )}
+              )}
+              </TabsContent>
+
+              <TabsContent value="diagnosis" className="mt-0">
+                <AiDiagnosisPanel ticker={ticker} />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>

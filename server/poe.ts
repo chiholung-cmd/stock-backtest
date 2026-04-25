@@ -1,4 +1,10 @@
 import { createParser } from "eventsource-parser";
+import { invokeLLM } from "./_core/llm";
+import yahooFinanceDefault from "yahoo-finance2";
+
+const YahooFinanceClass = yahooFinanceDefault as unknown as new (opts?: Record<string, unknown>) => {
+  search: (query: string, opts?: any) => Promise<any>;
+};
 
 export class PoeApiWrapper {
   private apiKey: string;
@@ -7,111 +13,96 @@ export class PoeApiWrapper {
     this.apiKey = apiKey;
   }
 
-  private async streamPoeResponse(botName: string, query: string, model: string, onToken: (token: string) => void) {
-    const response = await fetch(`https://api.poe.com/bot/${botName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': this.apiKey,
-      },
-      body: JSON.stringify({
-        query,
-        model,
-      }),
+  /**
+   * 獲取指定股票的最新新聞
+   */
+  public async getStockNews(ticker: string) {
+    try {
+      const yf = new YahooFinanceClass();
+      const searchResult = await yf.search(ticker, { newsCount: 5 });
+      return searchResult.news || [];
+    } catch (error) {
+      console.error(`Failed to fetch news for ${ticker}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * 使用 AI 進行情緒分析與診斷
+   */
+  public async diagnoseStock(ticker: string, model: string = "gemini-2.5-flash") {
+    const news = await this.getStockNews(ticker);
+    const newsContext = news.map((n: any) => `- ${n.title} (${n.publisher})`).join("\n");
+
+    const prompt = `
+你是一位專業的金融分析師。請針對股票代碼 "${ticker}" 進行深度診斷。
+以下是該股票的最新新聞：
+${newsContext || "暫無最新新聞"}
+
+請提供以下資訊：
+1. **市場情緒分析**：給出一個 -100 到 +100 的情緒評分（-100 最悲觀，+100 最樂觀），並簡述理由。
+2. **核心風險與機會**：總結目前該股票面臨的主要挑戰與潛在增長點。
+3. **投資建議**：給出「買入」、「持有」或「賣出」的建議，並解釋原因。
+
+請以繁體中文回答，並在最後附上一個 JSON 代碼塊，格式如下：
+\`\`\`json
+{
+  "score": number,
+  "sentiment": "悲觀" | "中立" | "樂觀",
+  "recommendation": "買入" | "持有" | "賣出",
+  "summary": "一句話總結"
+}
+\`\`\`
+`;
+
+    const result = await invokeLLM({
+      messages: [{ role: "user", content: prompt }],
     });
 
-    if (!response.ok) {
-      throw new Error(`Poe API error: ${response.statusText}`);
-    }
-
-    const parser = createParser((event) => {
-      if (event.type === 'event') {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.text) {
-            onToken(data.text);
-          }
-        } catch (error) {
-          console.error('Error parsing SSE event:', error);
-        }
-      }
-    });
-
-    if (response.body) {
-      const reader = response.body.getReader();
-      let done = false;
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          parser.feed(new TextDecoder().decode(value));
-        }
-      }
-    }
+    return result.choices[0].message.content as string;
   }
 
   public async analyzeGoal(goal: string, model: string): Promise<string> {
     console.log(`Analyzing goal: "${goal}" with model: ${model}`);
-    // Return a structured strategy recommendation with proper JSON format
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Determine strategy based on goal keywords
-        let strategy = "ma_crossover";
-        let params: Record<string, number> = { shortPeriod: 10, longPeriod: 30 };
-        let ticker = "AAPL";
-        let description = "平衡型策略";
+    
+    const prompt = `
+你是一位專業的量化投資顧問。用戶的投資目標是：「${goal}」。
+請為用戶推薦一個最適合的投資策略。目前我們支援以下策略類型：
+1. ma_crossover (均線交叉): 參數有 shortPeriod, longPeriod
+2. rsi (RSI指標): 參數有 period, oversold, overbought
+3. macd (MACD指標): 參數有 fastPeriod, slowPeriod, signalPeriod
+4. bollinger_bands (布林帶): 參數有 period, stdDev
 
-        if (goal.includes("穩定") || goal.includes("安全") || goal.includes("保守")) {
-          strategy = "rsi";
-          params = { period: 14, oversold: 30, overbought: 70 };
-          description = "保守型策略 - 基於 RSI 超賣/超買";
-        } else if (goal.includes("增長") || goal.includes("收益") || goal.includes("成長")) {
-          strategy = "macd";
-          params = { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 };
-          description = "成長型策略 - 基於 MACD 動能";
-        } else if (goal.includes("波動") || goal.includes("風險") || goal.includes("高收益")) {
-          strategy = "bollinger_bands";
-          params = { period: 20, stdDev: 2 };
-          description = "波動型策略 - 基於布林帶";
-        }
-
-        const strategyData = {
-          ticker,
-          strategy,
-          params,
-        };
-
-        resolve(`根據您的投資目標：「${goal}」，我為您推薦了一個 **${description}**。
-
-該策略已經過優化，您可以點擊下方按鈕直接執行回測驗證。
-
+請分析用戶的需求，給出專業建議，並以繁體中文回答。
+最後必須附上一個 JSON 代碼塊，包含推薦的股票代碼 (ticker) 和策略參數，格式如下：
 \`\`\`json
-${JSON.stringify(strategyData, null, 2)}
-\`\`\``);
-      }, 2000);
+{
+  "ticker": "AAPL",
+  "strategy": "ma_crossover",
+  "params": { "shortPeriod": 10, "longPeriod": 30 },
+  "description": "策略簡述"
+}
+\`\`\`
+`;
+
+    const result = await invokeLLM({
+      messages: [{ role: "user", content: prompt }],
     });
+
+    return result.choices[0].message.content as string;
   }
 
-  public async chat(message: string, model: string): Promise<string> {
-    console.log(`Chat message: "${message}" with model: ${model}`);
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Check if message is asking for strategy suggestion
-        if (message.includes("策略") || message.includes("建議") || message.includes("推薦")) {
-          const strategyData = {
-            ticker: "AAPL",
-            strategy: "ma_crossover",
-            params: { shortPeriod: 10, longPeriod: 30 },
-          };
-          resolve(`根據您的問題，我建議使用 MA 交叉策略。
+  public async chat(message: string, model: string, history: any[] = []): Promise<string> {
+    const messages = [
+      { role: "system", content: "你是一位專業的 AI 投資顧問 AlphaTest。你擅長使用繁體中文為用戶提供專業、易懂的投資建議與策略分析。" },
+      ...history,
+      { role: "user", content: message }
+    ];
 
-\`\`\`json
-${JSON.stringify(strategyData, null, 2)}
-\`\`\``);
-        } else {
-          resolve(`AI 助理 (模型: ${model}) 對於「${message}」的回答：這是一個模擬的對話回應。如果您需要策略建議，請告訴我您的投資目標。`);
-        }
-      }, 1500);
+    const result = await invokeLLM({
+      messages: messages as any,
     });
+
+    return result.choices[0].message.content as string;
   }
 }
