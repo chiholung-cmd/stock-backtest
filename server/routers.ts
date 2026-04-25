@@ -11,6 +11,7 @@ import {
 } from "./db";
 import { runBacktest } from "./backtest";
 import { PoeApiWrapper } from "./poe";
+import { parseNaturalLanguageStrategy, optimizeStrategyParameters, generateStrategyRecommendations } from "./strategyOptimizer";
 
 const poe = new PoeApiWrapper(process.env.POE_API_KEY || "");
 
@@ -66,6 +67,45 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const result = await poe.diagnoseStock(input.ticker, input.model);
         return { diagnosis: result };
+      }),
+    parseStrategy: protectedProcedure
+      .input(z.object({
+        description: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const strategy = await parseNaturalLanguageStrategy(input.description);
+        return { strategy };
+      }),
+    optimizeStrategy: protectedProcedure
+      .input(z.object({
+        strategyName: z.string(),
+        currentParams: z.record(z.string(), z.number()),
+        performance: z.object({
+          annualizedReturn: z.number(),
+          maxDrawdown: z.number(),
+          sharpeRatio: z.number(),
+          winRate: z.number(),
+        }),
+      }))
+      .mutation(async ({ input }) => {
+        const optimized = await optimizeStrategyParameters(
+          input.strategyName,
+          input.currentParams,
+          input.performance
+        );
+        return { optimizedParams: optimized };
+      }),
+    getRecommendations: protectedProcedure
+      .input(z.object({
+        marketCondition: z.string(),
+        riskTolerance: z.enum(["low", "medium", "high"]),
+      }))
+      .mutation(async ({ input }) => {
+        const recommendations = await generateStrategyRecommendations(
+          input.marketCondition,
+          input.riskTolerance
+        );
+        return { recommendations };
       }),
   }),
   system: systemRouter,
