@@ -1,29 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Search, X } from "lucide-react";
+import { Search, X, Globe, TrendingUp } from "lucide-react";
 
-// 美股常見代碼列表 (可從 API 動態擴展)
+// 全球常見代碼列表 (支援美股與港股)
 const STOCK_DATABASE = [
-  { symbol: "AAPL", name: "Apple Inc." },
-  { symbol: "MSFT", name: "Microsoft Corporation" },
-  { symbol: "GOOGL", name: "Alphabet Inc." },
-  { symbol: "AMZN", name: "Amazon.com Inc." },
-  { symbol: "NVDA", name: "NVIDIA Corporation" },
-  { symbol: "TSLA", name: "Tesla Inc." },
-  { symbol: "META", name: "Meta Platforms Inc." },
-  { symbol: "ASTS", name: "Astra Space Inc." },
-  { symbol: "ASML", name: "ASML Holding N.V." },
-  { symbol: "AMD", name: "Advanced Micro Devices" },
-  { symbol: "INTC", name: "Intel Corporation" },
-  { symbol: "NFLX", name: "Netflix Inc." },
-  { symbol: "PYPL", name: "PayPal Holdings Inc." },
-  { symbol: "ADBE", name: "Adobe Inc." },
-  { symbol: "CSCO", name: "Cisco Systems Inc." },
-  { symbol: "CRWD", name: "CrowdStrike Holdings" },
-  { symbol: "DDOG", name: "Datadog Inc." },
-  { symbol: "SNOW", name: "Snowflake Inc." },
-  { symbol: "CRM", name: "Salesforce Inc." },
-  { symbol: "OKTA", name: "Okta Inc." },
+  { symbol: "AAPL", name: "Apple Inc.", exchange: "NASDAQ", type: "US Stock" },
+  { symbol: "TSLA", name: "Tesla Inc.", exchange: "NASDAQ", type: "US Stock" },
+  { symbol: "NVDA", name: "NVIDIA Corp.", exchange: "NASDAQ", type: "US Stock" },
+  { symbol: "MSFT", name: "Microsoft Corp.", exchange: "NASDAQ", type: "US Stock" },
+  { symbol: "AMZN", name: "Amazon.com Inc.", exchange: "NASDAQ", type: "US Stock" },
+  { symbol: "GOOGL", name: "Alphabet Inc.", exchange: "NASDAQ", type: "US Stock" },
+  { symbol: "0700.HK", name: "騰訊控股", exchange: "HKEX", type: "HK Stock" },
+  { symbol: "9988.HK", name: "阿里巴巴", exchange: "HKEX", type: "HK Stock" },
+  { symbol: "3690.HK", name: "美團", exchange: "HKEX", type: "HK Stock" },
+  { symbol: "2318.HK", name: "中國平安", exchange: "HKEX", type: "HK Stock" },
+  { symbol: "BTC-USD", name: "Bitcoin", exchange: "CRYPTO", type: "Crypto" },
 ];
 
 interface StockSearchInputProps {
@@ -35,120 +26,60 @@ interface StockSearchInputProps {
 
 export function StockSearchInput({
   onSelect,
-  placeholder = "輸入股票代碼 (如: AAPL)",
+  placeholder = "輸入代碼 (如: AAPL, 0700.HK)",
   value: externalValue,
   onChange: onExternalChange,
 }: StockSearchInputProps) {
   const [value, setValue] = useState(externalValue || "");
   const [suggestions, setSuggestions] = useState<typeof STOCK_DATABASE>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-  const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 過濾股票列表
   useEffect(() => {
     const query = value.toUpperCase().trim();
-
     if (query.length === 0) {
       setSuggestions([]);
       setIsOpen(false);
       return;
     }
 
-    // 優先匹配符號開頭，然後匹配名稱
     const filtered = STOCK_DATABASE.filter(
       (stock) =>
         stock.symbol.startsWith(query) || stock.name.toUpperCase().includes(query)
-    )
-      .sort((a, b) => {
-        // 優先顯示符號完全匹配或開頭匹配的結果
-        const aSymbolMatch = a.symbol.startsWith(query);
-        const bSymbolMatch = b.symbol.startsWith(query);
-        if (aSymbolMatch && !bSymbolMatch) return -1;
-        if (!aSymbolMatch && bSymbolMatch) return 1;
-        return 0;
-      })
-      .slice(0, 5); // 最多顯示 5 筆
+    ).slice(0, 5);
 
     setSuggestions(filtered);
     setIsOpen(filtered.length > 0);
-    setSelectedIndex(-1);
   }, [value]);
 
-  // 處理外部值變化
   useEffect(() => {
     if (externalValue !== undefined && externalValue !== value) {
       setValue(externalValue);
     }
   }, [externalValue]);
 
-  // 處理點擊外部關閉下拉菜單
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 處理鍵盤導航
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!isOpen) return;
-
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setSelectedIndex((prev) =>
-          prev < suggestions.length - 1 ? prev + 1 : prev
-        );
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
-        break;
-      case "Enter":
-        e.preventDefault();
-        if (selectedIndex >= 0) {
-          selectStock(suggestions[selectedIndex].symbol);
-        }
-        break;
-      case "Escape":
-        setIsOpen(false);
-        break;
-    }
-  };
-
-  // 選擇股票
   const selectStock = (symbol: string) => {
     setValue(symbol);
     onExternalChange?.(symbol);
     onSelect?.(symbol);
     setIsOpen(false);
-    setSuggestions([]);
-  };
-
-  // 清空輸入
-  const handleClear = () => {
-    setValue("");
-    onExternalChange?.("");
-    setSuggestions([]);
-    setIsOpen(false);
-    inputRef.current?.focus();
   };
 
   return (
     <div ref={containerRef} className="relative w-full">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
         <Input
-          ref={inputRef}
           type="text"
           value={value}
           onChange={(e) => {
@@ -156,52 +87,41 @@ export function StockSearchInput({
             setValue(newValue);
             onExternalChange?.(newValue);
           }}
-          onKeyDown={handleKeyDown}
           onFocus={() => value && suggestions.length > 0 && setIsOpen(true)}
           placeholder={placeholder}
-          className="pl-10 pr-10"
+          className="pl-10 pr-10 h-12 text-lg font-bold tracking-wider rounded-xl border-slate-200 focus:ring-teal-500"
         />
         {value && (
-          <button
-            onClick={handleClear}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-          >
-            <X size={18} />
+          <button onClick={() => selectStock("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
+            <X size={16} />
           </button>
         )}
       </div>
 
-      {/* 下拉菜單 */}
-      {isOpen && suggestions.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-          {suggestions.map((stock, index) => (
-            <button
-              key={stock.symbol}
-              onClick={() => selectStock(stock.symbol)}
-              className={`w-full px-4 py-3 text-left transition-colors ${
-                index === selectedIndex
-                  ? "bg-teal-50 border-l-2 border-teal-600"
-                  : "hover:bg-gray-50"
-              } ${index !== suggestions.length - 1 ? "border-b border-gray-100" : ""}`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold text-gray-900">{stock.symbol}</div>
-                  <div className="text-xs text-gray-500">{stock.name}</div>
+      {isOpen && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50">
+          <div className="p-2">
+            {suggestions.map((stock) => (
+              <button
+                key={stock.symbol}
+                onClick={() => selectStock(stock.symbol)}
+                className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors">
+                    {stock.exchange === "HKEX" ? <Globe size={18} /> : <TrendingUp size={18} />}
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-black text-slate-900">{stock.symbol}</div>
+                    <div className="text-xs text-slate-500 font-medium">{stock.name}</div>
+                  </div>
                 </div>
-                {index === selectedIndex && (
-                  <div className="w-2 h-2 rounded-full bg-teal-600" />
-                )}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* 無結果提示 */}
-      {value && !isOpen && suggestions.length === 0 && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500 z-50">
-          找不到相符的股票代碼
+                <div className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-500 group-hover:bg-teal-100 group-hover:text-teal-700">
+                  {stock.exchange}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

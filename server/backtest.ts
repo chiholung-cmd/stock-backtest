@@ -220,10 +220,34 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     shares = 0;
   }
 
-  // Metrics
-  const totalReturn = (cash - input.initialCapital) / input.initialCapital;
-  const annualizedReturn = Math.pow(1 + totalReturn, 252 / data.length) - 1;
-  
+  // Metrics Calculation
+  const totalReturn = (equityCurve[equityCurve.length - 1].value - input.initialCapital) / input.initialCapital;
+  const days = data.length || 1;
+  const annualizedReturn = Math.pow(1 + totalReturn, 252 / days) - 1;
+
+  // Max Drawdown
+  let maxEquity = -Infinity;
+  let maxDD = 0;
+  for (const p of equityCurve) {
+    if (p.value > maxEquity) maxEquity = p.value;
+    const dd = (maxEquity - p.value) / maxEquity;
+    if (dd > maxDD) maxDD = dd;
+  }
+
+  // Win Rate
+  const completedTrades = trades.filter(t => t.action === "SELL" || t.action === "SELL (Close)");
+  const winningTrades = completedTrades.filter(t => (t.pnl || 0) > 0);
+  const winRate = completedTrades.length > 0 ? winningTrades.length / completedTrades.length : 0;
+
+  // Sharpe Ratio (Simplified: using daily returns std dev)
+  const dailyReturns = [];
+  for (let i = 1; i < equityCurve.length; i++) {
+    dailyReturns.push((equityCurve[i].value - equityCurve[i-1].value) / equityCurve[i-1].value);
+  }
+  const avgReturn = dailyReturns.reduce((a, b) => a + b, 0) / (dailyReturns.length || 1);
+  const stdDev = Math.sqrt(dailyReturns.map(x => Math.pow(x - avgReturn, 2)).reduce((a, b) => a + b, 0) / (dailyReturns.length || 1));
+  const sharpeRatio = stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252) : 0;
+
   return {
     ticker: input.ticker,
     strategy: input.strategy,
@@ -231,10 +255,10 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     startDate: input.startDate,
     endDate: input.endDate,
     annualizedReturn,
-    maxDrawdown: 0.15, // Placeholder for simplicity
-    sharpeRatio: 1.2, // Placeholder for simplicity
-    winRate: 0.55, // Placeholder for simplicity
-    totalTrades: trades.filter(t => t.action === "BUY" || t.action === "SELL").length,
+    maxDrawdown: maxDD,
+    sharpeRatio,
+    winRate,
+    totalTrades: completedTrades.length,
     equityCurve,
     trades,
   };

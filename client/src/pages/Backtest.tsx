@@ -1,20 +1,19 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { StockSearchInput } from "@/components/StockSearchInput";
 import { toast } from "sonner";
 import {
   BarChart3, TrendingUp, TrendingDown, Zap, Activity,
-  Play, Save, ArrowLeft, ChevronDown, ChevronUp, Info
+  Play, Save, ArrowLeft, Info, Globe, Calculator
 } from "lucide-react";
 import { Link } from "wouter";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine
+  ResponsiveContainer
 } from "recharts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -90,47 +89,49 @@ function MetricCard({
   value,
   format,
   icon: Icon,
-  positive,
   description,
 }: {
   label: string;
-  value: number | null;
+  value: number | null | undefined;
   format: "percent" | "number" | "ratio";
   icon: React.ElementType;
-  positive?: boolean;
-  description?: string;
+  description: string;
 }) {
-  const formatted =
-    value === null
-      ? "—"
+  const isPositive = value !== null && value !== undefined && value > 0;
+  
+  const formattedValue =
+    value === null || value === undefined
+      ? "N/A"
       : format === "percent"
-      ? `${(value * 100).toFixed(2)}%`
-      : format === "ratio"
-      ? value.toFixed(3)
-      : value.toString();
+      ? (value * 100).toFixed(2) + "%"
+      : format === "number"
+      ? value.toString()
+      : value.toFixed(2);
 
-  const isPositive = positive !== undefined ? positive : (value ?? 0) >= 0;
-  const colorClass = format === "percent" || format === "ratio"
-    ? isPositive ? "text-positive" : "text-negative"
-    : "text-gray-900";
+  const displayColorClass = label === "最大回撤" 
+    ? "bg-rose-50 text-rose-600 border-rose-100" 
+    : isPositive 
+    ? "bg-teal-50 text-teal-600 border-teal-100" 
+    : "bg-slate-50 text-slate-600 border-slate-100";
+
+  const textColorClass = label === "最大回撤"
+    ? "text-rose-700"
+    : isPositive
+    ? "text-teal-700"
+    : "text-slate-700";
 
   return (
-    <div className="metric-card p-5">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Icon size={16} className="text-gray-400" />
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</span>
+    <div className={`rounded-3xl border p-6 shadow-sm transition-all hover:shadow-md bg-white`}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`p-2.5 rounded-2xl ${displayColorClass}`}>
+          <Icon size={20} />
         </div>
-        {description && (
-          <div className="group relative">
-            <Info size={13} className="text-gray-300 cursor-help" />
-            <div className="absolute right-0 top-5 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-              {description}
-            </div>
-          </div>
-        )}
+        <span className="text-xs font-black text-slate-500 uppercase tracking-widest">{label}</span>
       </div>
-      <div className={`text-2xl font-extrabold ${colorClass}`}>{formatted}</div>
+      <div className={`text-3xl font-black tracking-tight ${textColorClass}`}>
+        {formattedValue}
+      </div>
+      <p className="text-xs text-slate-400 mt-3 font-bold leading-snug">{description}</p>
     </div>
   );
 }
@@ -138,11 +139,11 @@ function MetricCard({
 // ─── TradingView Widget ───────────────────────────────────────────────────────
 
 function TradingViewWidget({ ticker }: { ticker: string }) {
-  const symbol = ticker.includes(":") ? ticker : `NASDAQ:${ticker}`;
+  const symbol = ticker.includes(":") ? ticker : ticker.includes(".HK") ? `HKEX:${ticker.replace(".HK", "")}` : `NASDAQ:${ticker}`;
   return (
-    <div className="w-full h-[420px] rounded-xl overflow-hidden border border-gray-100">
+    <div className="w-full h-[420px] rounded-[2rem] overflow-hidden border border-slate-100 shadow-inner">
       <iframe
-        src={`https://www.tradingview.com/widgetembed/?frameElementId=tv_chart&symbol=${encodeURIComponent(symbol)}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=light&style=1&timezone=Asia%2FHong_Kong&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=zh_TW&utm_source=&utm_medium=widget&utm_campaign=chart&utm_term=${encodeURIComponent(symbol)}`}
+        src={`https://www.tradingview.com/widgetembed/?frameElementId=tv_chart&symbol=${encodeURIComponent(symbol)}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=light&style=1&timezone=Asia%2FHong_Kong&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=zh_TW`}
         style={{ width: "100%", height: "100%", border: "none" }}
         allowFullScreen
         title={`TradingView Chart - ${ticker}`}
@@ -151,224 +152,88 @@ function TradingViewWidget({ ticker }: { ticker: string }) {
   );
 }
 
-// ─── Equity Curve Chart ───────────────────────────────────────────────────────
-
-function EquityCurveChart({ data, initialCapital = 10000 }: { data: { date: string; value: number }[]; initialCapital?: number }) {
-  if (!data || data.length === 0) return null;
-
-  const minVal = Math.min(...data.map(d => d.value));
-  const maxVal = Math.max(...data.map(d => d.value));
-  const finalValue = data[data.length - 1]?.value ?? initialCapital;
-  const isPositive = finalValue >= initialCapital;
-
-  const chartColor = isPositive ? "oklch(0.52 0.18 150)" : "oklch(0.55 0.22 25)";
-
-  // Sample data for performance (max 200 points)
-  const step = Math.max(1, Math.floor(data.length / 200));
-  const sampledData = data.filter((_, i) => i % step === 0 || i === data.length - 1);
-
-  return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">資產淨值曲線</h3>
-        <div className="flex items-center gap-2 text-xs text-gray-400">
-          <span>初始資本 $10,000</span>
-          <span>→</span>
-          <span className={isPositive ? "text-positive font-semibold" : "text-negative font-semibold"}>
-            ${finalValue.toFixed(0)}
-          </span>
-        </div>
-      </div>
-      <ResponsiveContainer width="100%" height={260}>
-        <AreaChart data={sampledData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-          <defs>
-            <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={chartColor} stopOpacity={0.2} />
-              <stop offset="95%" stopColor={chartColor} stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.93 0.004 240)" />
-          <XAxis
-            dataKey="date"
-            tick={{ fontSize: 10, fill: "oklch(0.6 0.01 240)" }}
-            tickFormatter={(v) => v.slice(0, 7)}
-            interval="preserveStartEnd"
-          />
-          <YAxis
-            tick={{ fontSize: 10, fill: "oklch(0.6 0.01 240)" }}
-            tickFormatter={(v) => `$${v.toFixed(0)}`}
-            domain={[minVal * 0.98, maxVal * 1.02]}
-            width={70}
-          />
-          <Tooltip
-            formatter={(value: number) => [`$${value.toFixed(2)}`, "淨值"]}
-            labelFormatter={(label) => `日期: ${label}`}
-            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid oklch(0.92 0.004 240)" }}
-          />
-          <ReferenceLine y={initialCapital} stroke="oklch(0.7 0.01 240)" strokeDasharray="4 4" strokeWidth={1} />
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke={chartColor}
-            strokeWidth={2}
-            fill="url(#equityGradient)"
-            dot={false}
-            activeDot={{ r: 4, fill: chartColor }}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-// ─── Trade List ───────────────────────────────────────────────────────────────
-
-function TradeList({ trades }: { trades: BacktestResult["trades"] }) {
-  const [expanded, setExpanded] = useState(false);
-  const displayTrades = expanded ? trades : trades.slice(0, 8);
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">交易記錄</h3>
-        <span className="text-xs text-gray-400">{trades.length} 筆</span>
-      </div>
-      <div className="space-y-1.5">
-        {displayTrades.map((trade, i) => (
-          <div
-            key={i}
-            className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 text-xs"
-          >
-            <div className="flex items-center gap-3">
-              <span
-                className={`px-2 py-0.5 rounded font-semibold ${
-                  trade.action.startsWith("BUY")
-                    ? "bg-positive-light text-positive"
-                    : "bg-negative-light text-negative"
-                }`}
-              >
-                {trade.action.startsWith("BUY") ? "買入" : "賣出"}
-              </span>
-              <span className="font-mono text-gray-500">{trade.date}</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="font-mono text-gray-700">${trade.price.toFixed(2)}</span>
-              {trade.pnl !== null && (
-                <span className={`font-semibold font-mono ${trade.pnl >= 0 ? "text-positive" : "text-negative"}`}>
-                  {trade.pnl >= 0 ? "+" : ""}{(trade.pnl * 100).toFixed(2)}%
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-      {trades.length > 8 && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="mt-3 w-full text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1 py-2"
-        >
-          {expanded ? <><ChevronUp size={14} /> 收起</> : <><ChevronDown size={14} /> 顯示全部 {trades.length} 筆</>}
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ─── Main Backtest Page ───────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Backtest() {
   const { user, isAuthenticated } = useAuth();
-
+  
   // Form state
   const [ticker, setTicker] = useState("AAPL");
   const [strategy, setStrategy] = useState<Strategy>("ma_crossover");
   const [params, setParams] = useState<Record<string, number>>({});
-  const [startDate, setStartDate] = useState("2022-01-01");
-  const [endDate, setEndDate] = useState("2024-12-31");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [timeframe, setTimeframe] = useState<"1d" | "1wk" | "1mo">("1d");
   const [initialCapital, setInitialCapital] = useState(10000);
   const [contributeAmount, setContributeAmount] = useState(0);
   const [contributePeriod, setContributePeriod] = useState<"none" | "weekly" | "monthly" | "quarterly">("none");
   const [redrawAmount, setRedrawAmount] = useState(0);
   const [redrawPeriod, setRedrawPeriod] = useState<"none" | "weekly" | "monthly" | "quarterly">("none");
+  const [currency, setCurrency] = useState("HKD");
 
   // Result state
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [isSaved, setIsSaved] = useState(false);
 
-  // 解析 URL 參數 (來自 AI 顧問)
+  // 解析 URL 參數
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlTicker = params.get("ticker");
-    const urlStrategy = params.get("strategy");
-    const urlParams = params.get("params");
+    const paramsObj = new URLSearchParams(window.location.search);
+    const tickerParam = paramsObj.get("ticker");
+    const strategyParam = paramsObj.get("strategy");
+    const strategyParamsJson = paramsObj.get("params");
 
-    if (urlTicker) setTicker(urlTicker);
-    if (urlStrategy) setStrategy(urlStrategy as Strategy);
-    if (urlParams) {
+    if (tickerParam) setTicker(tickerParam);
+    if (strategyParam) setStrategy(strategyParam as Strategy);
+    if (strategyParamsJson) {
       try {
-        setParams(JSON.parse(urlParams));
+        setParams(JSON.parse(strategyParamsJson));
       } catch (e) {
-        console.error("Failed to parse URL params", e);
+        console.error("Failed to parse strategy params from URL", e);
       }
     }
   }, []);
 
   const selectedStrategy = STRATEGIES.find(s => s.id === strategy)!;
 
-  // Get current param value
-  const getParam = useCallback((key: string, defaultVal: number) => {
-    return params[key] ?? defaultVal;
-  }, [params]);
-
-  const setParam = (key: string, value: number) => {
-    setParams(prev => ({ ...prev, [key]: value }));
-  };
-
-  // Build params object with defaults
-  const buildParams = () => {
-    const result: Record<string, number> = {};
+  // Initialize params when strategy changes
+  useEffect(() => {
+    const newParams: Record<string, number> = {};
     selectedStrategy.params.forEach(p => {
-      result[p.key] = getParam(p.key, p.default);
+      newParams[p.key] = params[p.key] ?? p.default;
     });
-    return result;
-  };
+    setParams(newParams);
+  }, [strategy]);
 
-  // tRPC mutation
   const runMutation = trpc.backtest.run.useMutation({
     onSuccess: (data) => {
       setResult(data as BacktestResult);
       setIsSaved(false);
-      toast.success(`${data.ticker} 回測完成！共 ${data.totalTrades} 筆交易`);
+      toast.success("回測完成！");
     },
     onError: (err) => {
-      toast.error(`回測失敗：${err.message}`);
+      toast.error(`回測失敗: ${err.message}`);
     },
   });
 
   const saveMutation = trpc.backtest.save.useMutation({
     onSuccess: () => {
       setIsSaved(true);
-      toast.success("回測結果已儲存！");
+      toast.success("結果已儲存至歷史記錄");
     },
     onError: (err) => {
-      toast.error(`儲存失敗：${err.message}`);
+      toast.error(`儲存失敗: ${err.message}`);
     },
   });
 
   const handleRun = () => {
-    if (!ticker.trim()) {
-      toast.error("請輸入股票代碼");
-      return;
-    }
-    if (startDate >= endDate) {
-      toast.error("結束日期必須晚於開始日期");
+    if (!startDate || !endDate) {
+      toast.error("請選擇開始與結束日期");
       return;
     }
     runMutation.mutate({
-      ticker: ticker.trim().toUpperCase(),
+      ticker,
       strategy,
-      params: buildParams(),
+      params,
       startDate,
       endDate,
       timeframe,
@@ -377,12 +242,11 @@ export default function Backtest() {
       contributePeriod,
       redrawAmount,
       redrawPeriod,
-      saveResult: false,
     });
   };
 
   const handleSave = () => {
-    if (!result || !isAuthenticated) return;
+    if (!result) return;
     saveMutation.mutate({
       ticker: result.ticker,
       strategy: result.strategy,
@@ -400,354 +264,236 @@ export default function Backtest() {
   };
 
   return (
-    <div className="min-h-screen grid-bg">
-      {/* Top Navigation */}
-      <nav className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
-        <div className="container flex items-center justify-between h-14">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
-              <ArrowLeft size={16} />
-              <span className="text-sm">返回首頁</span>
-            </Link>
-            <div className="w-px h-4 bg-gray-200" />
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: "oklch(0.52 0.18 195)" }}>
-                <BarChart3 size={12} className="text-white" />
-              </div>
-              <span className="font-bold text-gray-900">策略回測</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/history" className="text-sm text-gray-500 hover:text-gray-900">歷史記錄</Link>
-            <Link href="/compare" className="text-sm text-gray-500 hover:text-gray-900">比較分析</Link>
-            {!isAuthenticated && (
-              <Link href="/login">
-                <Button size="sm" variant="outline" className="text-xs">登入以儲存結果</Button>
-              </Link>
-            )}
-          </div>
+    <div className="min-h-screen bg-[#F8FAFC] pb-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12">
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="rounded-full bg-white shadow-sm border border-slate-100">
+              <ArrowLeft size={20} />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">策略回測驗證</h1>
         </div>
-      </nav>
 
-      <div className="container py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* ─── Left Panel: Config ─── */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-8">
+              {/* Stock Search */}
+              <div className="space-y-3">
+                <Label className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <Globe size={16} className="text-teal-600" /> 選擇股票標的
+                </Label>
+                <StockSearchInput 
+                  value={ticker} 
+                  onSelect={setTicker} 
+                  onChange={setTicker} 
+                />
+              </div>
 
-          {/* ─── Left Panel: Configuration ─── */}
-          <div className="space-y-5">
-
-            {/* Stock Input */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-              <h2 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "oklch(0.52 0.18 195 / 0.15)" }}>
-                  <TrendingUp size={12} style={{ color: "oklch(0.52 0.18 195)" }} />
-                </div>
-                股票代碼
-              </h2>
-              <StockSearchInput
-                value={ticker}
-                onChange={setTicker}
-                onSelect={setTicker}
-                placeholder="輸入股票代碼或名稱"
-              />
-              <p className="text-xs text-gray-400 mt-2 text-center">支援美股市場所有標的</p>
-            </div>
-
-            {/* Timeframe & Capital */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
-              <h2 className="text-base font-bold text-gray-900 mb-2 flex items-center gap-2">
-                <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "oklch(0.52 0.18 195 / 0.15)" }}>
-                  <Activity size={12} style={{ color: "oklch(0.52 0.18 195)" }} />
-                </div>
-                時間週期與資金管理
-              </h2>
-              
-              <div className="space-y-2">
-                <Label className="text-xs">時間週期</Label>
-                <div className="flex gap-2">
-                  {(["1d", "1wk", "1mo"] as const).map(tf => (
-                    <Button
-                      key={tf}
-                      size="sm"
-                      variant={timeframe === tf ? "default" : "outline"}
-                      onClick={() => setTimeframe(tf)}
-                      className="flex-1 text-xs"
+              {/* Strategy Select */}
+              <div className="space-y-3">
+                <Label className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <Zap size={16} className="text-amber-500" /> 選擇交易策略
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {STRATEGIES.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => setStrategy(s.id)}
+                      className={`px-4 py-3 rounded-2xl text-xs font-bold transition-all border ${
+                        strategy === s.id 
+                        ? "bg-slate-900 text-white border-slate-900 shadow-md" 
+                        : "bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100"
+                      }`}
                     >
-                      {tf === "1d" ? "日線" : tf === "1wk" ? "週線" : "月線"}
-                    </Button>
+                      {s.name}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs">初始資金 ($)</Label>
-                <Input
-                  type="number"
-                  value={initialCapital}
-                  onChange={e => setInitialCapital(Number(e.target.value))}
-                  className="h-9"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-xs">定期投入</Label>
-                  <Input
-                    type="number"
-                    value={contributeAmount}
-                    onChange={e => setContributeAmount(Number(e.target.value))}
-                    placeholder="金額"
-                    className="h-9"
-                  />
+              {/* Strategy Params */}
+              <div className="space-y-4 pt-4 border-t border-slate-50">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-black text-slate-900">策略參數</Label>
+                  <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">CUSTOM</span>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">投入頻率</Label>
-                  <select
-                    value={contributePeriod}
-                    onChange={e => setContributePeriod(e.target.value as any)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
-                  >
-                    <option value="none">無</option>
-                    <option value="weekly">每週</option>
-                    <option value="monthly">每月</option>
-                    <option value="quarterly">每季</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Strategy Selection */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-              <h2 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "oklch(0.65 0.22 25 / 0.15)" }}>
-                  <Zap size={12} style={{ color: "oklch(0.65 0.22 25)" }} />
-                </div>
-                交易策略
-              </h2>
-              <div className="space-y-2">
-                {STRATEGIES.map(s => (
-                  <button
-                    key={s.id}
-                    onClick={() => { setStrategy(s.id); setParams({}); }}
-                    className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
-                      strategy === s.id
-                        ? "border-2 bg-white"
-                        : "border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-200"
-                    }`}
-                    style={strategy === s.id ? { borderColor: s.color } : {}}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm text-gray-900">{s.name}</span>
-                      {strategy === s.id && (
-                        <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{s.description}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Strategy Parameters */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-              <h2 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "oklch(0.58 0.2 260 / 0.15)" }}>
-                  <Activity size={12} style={{ color: "oklch(0.58 0.2 260)" }} />
-                </div>
-                策略參數
-              </h2>
-              <div className="space-y-5">
                 {selectedStrategy.params.map(p => (
-                  <div key={p.key}>
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="text-xs font-medium text-gray-600">{p.label}</Label>
-                      <span className="text-sm font-bold font-mono" style={{ color: selectedStrategy.color }}>
-                        {getParam(p.key, p.default)}
-                      </span>
+                  <div key={p.key} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs font-bold text-slate-500">{p.label}</Label>
+                      <span className="text-xs font-black text-teal-600">{params[p.key] || p.default}</span>
                     </div>
-                    <Slider
+                    <input
+                      type="range"
                       min={p.min}
                       max={p.max}
                       step={p.step}
-                      value={[getParam(p.key, p.default)]}
-                      onValueChange={([v]) => setParam(p.key, v)}
-                      className="w-full"
+                      value={params[p.key] || p.default}
+                      onChange={e => setParams(prev => ({ ...prev, [p.key]: Number(e.target.value) }))}
+                      className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600"
                     />
-                    <div className="flex justify-between text-xs text-gray-300 mt-1">
-                      <span>{p.min}</span>
-                      <span>{p.max}</span>
-                    </div>
                   </div>
                 ))}
               </div>
-            </div>
 
-            {/* Date Range */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-              <h2 className="text-base font-bold text-gray-900 mb-4">回測時間範圍</h2>
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-xs font-medium text-gray-600 mb-1.5 block">開始日期</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={e => setStartDate(e.target.value)}
-                    className="text-sm"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs font-medium text-gray-600 mb-1.5 block">結束日期</Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={e => setEndDate(e.target.value)}
-                    className="text-sm"
-                  />
+              {/* Money Management */}
+              <div className="space-y-4 pt-4 border-t border-slate-50">
+                <Label className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <Calculator size={16} className="text-blue-600" /> 資金管理設定
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase">結算幣別</Label>
+                    <select
+                      value={currency}
+                      onChange={e => setCurrency(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-slate-100 bg-slate-50 px-3 text-sm font-bold text-slate-700"
+                    >
+                      <option value="HKD">HKD (預設)</option>
+                      <option value="USD">USD</option>
+                      <option value="CNY">CNY</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase">初始資金</Label>
+                    <Input
+                      type="number"
+                      value={initialCapital}
+                      onChange={e => setInitialCapital(Number(e.target.value))}
+                      className="h-10 rounded-xl bg-slate-50 border-slate-100 font-bold"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Run Button */}
-            <Button
-              onClick={handleRun}
-              disabled={runMutation.isPending}
-              className="w-full h-12 text-white font-bold text-base gap-2"
-              style={{ background: "oklch(0.52 0.18 195)" }}
-            >
-              {runMutation.isPending ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  正在執行回測...
-                </>
-              ) : (
-                <>
-                  <Play size={18} />
-                  執行回測
-                </>
-              )}
-            </Button>
+              {/* Time Range */}
+              <div className="space-y-4 pt-4 border-t border-slate-50">
+                <Label className="text-sm font-black text-slate-900">回測時間範圍</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase">開始日期</Label>
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={e => setStartDate(e.target.value)}
+                      className="h-10 rounded-xl bg-slate-50 border-slate-100 font-bold"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase">結束日期</Label>
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={e => setEndDate(e.target.value)}
+                      className="h-10 rounded-xl bg-slate-50 border-slate-100 font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Run Button */}
+              <Button
+                onClick={handleRun}
+                disabled={runMutation.isPending}
+                className="w-full h-14 bg-gradient-to-r from-teal-600 to-blue-600 text-white font-black text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+              >
+                {runMutation.isPending ? "正在執行..." : "執行回測驗證"}
+              </Button>
+            </div>
           </div>
 
           {/* ─── Right Panel: Results ─── */}
-          <div className="space-y-6">
+          <div className="lg:col-span-8 space-y-8">
             {!result && !runMutation.isPending && (
-              <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
-                <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "oklch(0.52 0.18 195 / 0.1)" }}>
-                  <BarChart3 size={28} style={{ color: "oklch(0.52 0.18 195)" }} />
+              <div className="bg-white rounded-[2.5rem] border border-slate-100 p-24 text-center shadow-sm">
+                <div className="w-20 h-20 rounded-3xl mx-auto mb-6 flex items-center justify-center bg-slate-50 text-slate-300">
+                  <BarChart3 size={40} />
                 </div>
-                <h3 className="text-lg font-bold text-gray-700 mb-2">尚未執行回測</h3>
-                <p className="text-sm text-gray-400">在左側設定股票代碼、策略與時間範圍，然後點擊「執行回測」</p>
+                <h3 className="text-2xl font-black text-slate-900 mb-3">準備就緒</h3>
+                <p className="text-slate-500 font-medium">在左側設定參數後點擊執行，AI 回測引擎將為您分析績效。</p>
               </div>
             )}
 
             {runMutation.isPending && (
-              <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
-                <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center animate-pulse" style={{ background: "oklch(0.52 0.18 195 / 0.1)" }}>
-                  <Activity size={28} style={{ color: "oklch(0.52 0.18 195)" }} />
+              <div className="bg-white rounded-[2.5rem] border border-slate-100 p-24 text-center shadow-sm">
+                <div className="w-20 h-20 rounded-3xl mx-auto mb-6 flex items-center justify-center bg-teal-50 text-teal-600 animate-pulse">
+                  <Activity size={40} />
                 </div>
-                <h3 className="text-lg font-bold text-gray-700 mb-2">正在執行回測</h3>
-                <p className="text-sm text-gray-400">從 Yahoo Finance 獲取數據並計算策略信號...</p>
+                <h3 className="text-2xl font-black text-slate-900 mb-3">正在計算策略績效</h3>
+                <p className="text-slate-500 font-medium">獲取 Yahoo Finance 歷史數據並模擬交易信號...</p>
               </div>
             )}
 
             {result && (
-              <>
-                {/* Result Header */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <h2 className="text-2xl font-extrabold text-gray-900">{result.ticker}</h2>
-                        <span
-                          className="px-3 py-1 rounded-full text-xs font-semibold"
-                          style={{
-                            background: selectedStrategy.color + "15",
-                            color: selectedStrategy.color,
-                          }}
-                        >
-                          {selectedStrategy.name}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-400">
-                        {result.startDate} ~ {result.endDate}
-                      </p>
-                    </div>
-                    {isAuthenticated && (
-                      <Button
-                        onClick={handleSave}
-                        disabled={isSaved || saveMutation.isPending}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <Save size={14} />
-                        {isSaved ? "已儲存" : "儲存結果"}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
                 {/* Performance Metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                   <MetricCard
                     label="年化報酬率"
                     value={result.annualizedReturn}
                     format="percent"
                     icon={TrendingUp}
-                    description="以年化計算的總報酬率"
+                    description="以複利計算的平均年化回報"
                   />
                   <MetricCard
                     label="最大回撤"
                     value={result.maxDrawdown}
                     format="percent"
                     icon={TrendingDown}
-                    positive={false}
-                    description="從高點到低點的最大跌幅"
+                    description="歷史最大淨值跌幅"
                   />
                   <MetricCard
                     label="夏普比率"
                     value={result.sharpeRatio}
                     format="ratio"
                     icon={Activity}
-                    positive={(result.sharpeRatio ?? 0) > 0}
-                    description="每單位風險的超額報酬（>1 為佳）"
+                    description="風險調整後的報酬表現"
                   />
                   <MetricCard
                     label="勝率"
                     value={result.winRate}
                     format="percent"
                     icon={Zap}
-                    positive={(result.winRate ?? 0) >= 0.5}
-                    description="獲利交易佔總交易的比例"
-                  />
-                  <MetricCard
-                    label="總交易次數"
-                    value={result.totalTrades}
-                    format="number"
-                    icon={BarChart3}
-                    description="回測期間的完整交易筆數"
+                    description="獲利交易佔總交易比例"
                   />
                 </div>
 
-                {/* Equity Curve */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                  <EquityCurveChart data={result.equityCurve} />
+                {/* Charts */}
+                <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-xl font-black text-slate-900">資產增長曲線</h3>
+                    <div className="text-xs font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">
+                      {result.ticker} · {result.startDate} ~ {result.endDate}
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={result.equityCurve}>
+                      <defs>
+                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0d9488" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="date" hide />
+                      <YAxis hide domain={['auto', 'auto']} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                        formatter={(val: number) => [`$${val.toFixed(2)}`, '資產淨值']}
+                      />
+                      <Area type="monotone" dataKey="value" stroke="#0d9488" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
 
-                {/* TradingView Chart */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
-                    K 線圖表 · TradingView
-                  </h3>
+                {/* TradingView */}
+                <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
+                  <h3 className="text-xl font-black text-slate-900 mb-6">TradingView 市場圖表</h3>
                   <TradingViewWidget ticker={result.ticker} />
                 </div>
-
-                {/* Trade List */}
-                {result.trades.length > 0 && (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                    <TradeList trades={result.trades} />
-                  </div>
-                )}
-              </>
+              </div>
             )}
           </div>
         </div>
