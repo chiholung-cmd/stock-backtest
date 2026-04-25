@@ -9,6 +9,8 @@ import Backtest from "./pages/Backtest";
 import History from "./pages/History";
 import Compare from "./pages/Compare";
 import Login from "./pages/Login";
+import AiAdvisor from "./pages/AiAdvisor";
+import AiChatWidget from "./components/AiChatWidget";
 
 function Router() {
   return (
@@ -18,6 +20,7 @@ function Router() {
       <Route path="/history" component={History} />
       <Route path="/compare" component={Compare} />
       <Route path="/login" component={Login} />
+      <Route path="/ai-advisor" component={AiAdvisor} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
@@ -31,6 +34,7 @@ function App() {
         <TooltipProvider>
           <Toaster richColors position="top-right" />
           <Router />
+          <AiChatWidget />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

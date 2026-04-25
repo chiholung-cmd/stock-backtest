@@ -10,6 +10,9 @@ import {
   deleteBacktestResult,
 } from "./db";
 import { runBacktest } from "./backtest";
+import { PoeApiWrapper } from "./poe";
+
+const poe = new PoeApiWrapper(process.env.POE_API_KEY || "");
 
 // ─── Strategy param schemas ───────────────────────────────────────────────────
 
@@ -25,6 +28,26 @@ const RunBacktestInput = z.object({
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const appRouter = router({
+  ai: router({
+    analyzeGoal: protectedProcedure
+      .input(z.object({
+        goal: z.string().min(1),
+        model: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await poe.analyzeGoal(input.goal, input.model);
+        return { analysis: result };
+      }),
+    chat: protectedProcedure
+      .input(z.object({
+        message: z.string().min(1),
+        model: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const response = await poe.chat(input.message, input.model);
+        return { response };
+      }),
+  }),
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
