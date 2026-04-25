@@ -11,19 +11,22 @@ export async function getDb() {
       console.log("[Database] Initializing connection...");
       
       let connectionString = process.env.DATABASE_URL;
-      // 確保 SSL 配置正確
-      if (connectionString.includes("tidbcloud.com") && !connectionString.includes("ssl=")) {
-        const separator = connectionString.includes("?") ? "&" : "?";
-        connectionString += `${separator}ssl={"rejectUnauthorized":true}`;
-      }
+      
+      // 移除原有的 ssl 參數，我們改用 pool 物件控制
+      const url = new URL(connectionString.startsWith('mysql://') ? connectionString : `mysql://${connectionString}`);
+      const cleanUri = `${url.protocol}//${url.username}:${url.password}@${url.host}${url.pathname}`;
 
       const poolConnection = mysql.createPool({
-        uri: connectionString,
+        uri: cleanUri,
         ssl: {
-          rejectUnauthorized: true
+          // 在 Render/TiDB Serverless 環境中，有時需要放寬驗證以成功握手
+          rejectUnauthorized: false 
         },
         enableKeepAlive: true,
-        connectionLimit: 5, // 減少連線數以適應 Serverless
+        connectionLimit: 5,
+        waitForConnections: true,
+        queueLimit: 0,
+        idleTimeout: 60000, // 1 minute
       });
 
       _db = drizzle(poolConnection);
@@ -47,17 +50,16 @@ export async function createUser(data: {
   if (!db) throw new Error("Database not available");
 
   try {
-    // 顯式提供所有必填欄位，避免 TiDB 預設值衝突
+    // 極簡化寫入，僅傳遞最核心欄位，其餘交給資料庫 DEFAULT
     await db.insert(users).values({
       email: data.email.toLowerCase().trim(),
       passwordHash: data.passwordHash,
-      name: data.name ?? null,
-      role: "user",
-      // 不傳遞 createdAt, updatedAt, lastSignedIn 讓資料庫使用 defaultNow()
+      name: data.name?.trim() || null,
     });
   } catch (error: any) {
     console.error(`[Database] createUser failed for ${data.email}:`, error);
-    throw new Error(`資料庫寫入失敗: ${error.message}`);
+    // 拋出原始錯誤以便超級日誌捕捉
+    throw error;
   }
 }
 
