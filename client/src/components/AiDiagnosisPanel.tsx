@@ -9,7 +9,10 @@ import {
   CheckCircle2,
   Loader2,
   RefreshCw,
-  Quote
+  Quote,
+  Clock,
+  Calendar,
+  BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -19,9 +22,64 @@ interface AiDiagnosisPanelProps {
   ticker: string;
 }
 
+interface StructuredData {
+  score: number;
+  shortTermScore?: number;
+  midTermScore?: number;
+  longTermScore?: number;
+  sentiment: string;
+  recommendation: string;
+  summary: string;
+}
+
+function ScoreCard({
+  label,
+  sublabel,
+  score,
+  icon,
+  iconBg,
+  iconColor,
+}: {
+  label: string;
+  sublabel: string;
+  score: number;
+  icon: React.ReactNode;
+  iconBg: string;
+  iconColor: string;
+}) {
+  const isPositive = score >= 0;
+  return (
+    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-center gap-2 mb-3">
+        <div className={`p-2 rounded-xl ${iconBg}`}>
+          {icon}
+        </div>
+        <div>
+          <span className="text-xs font-black text-slate-400 uppercase tracking-widest block">{label}</span>
+          <span className="text-[10px] text-slate-300 font-medium">{sublabel}</span>
+        </div>
+      </div>
+      <div className="flex items-end gap-1">
+        <span className={`text-3xl font-black ${isPositive ? "text-teal-600" : "text-rose-600"}`}>{score > 0 ? "+" : ""}{score}</span>
+        <span className="text-sm font-bold text-slate-400 mb-1">/ 100</span>
+      </div>
+      <div className="mt-3">
+        <Progress
+          value={(score + 100) / 2}
+          className={`h-1.5 rounded-full ${isPositive ? "[&>div]:bg-teal-500" : "[&>div]:bg-rose-500"}`}
+        />
+        <div className="flex justify-between mt-1.5">
+          <span className="text-[9px] font-bold text-slate-300">悲觀</span>
+          <span className="text-[9px] font-bold text-slate-300">樂觀</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AiDiagnosisPanel({ ticker }: AiDiagnosisPanelProps) {
   const [diagnosis, setDiagnosis] = useState<string | null>(null);
-  const [structuredData, setStructuredData] = useState<any>(null);
+  const [structuredData, setStructuredData] = useState<StructuredData | null>(null);
   const [loading, setLoading] = useState(false);
   const lastTickerRef = useRef<string>("");
 
@@ -44,7 +102,11 @@ export function AiDiagnosisPanel({ ticker }: AiDiagnosisPanelProps) {
       // 嘗試解析 JSON
       const match = result.diagnosis.match(/```json\n([\s\S]*?)\n```/);
       if (match) {
-        setStructuredData(JSON.parse(match[1]));
+        try {
+          setStructuredData(JSON.parse(match[1]));
+        } catch {
+          setStructuredData(null);
+        }
       } else {
         setStructuredData(null);
       }
@@ -76,66 +138,105 @@ export function AiDiagnosisPanel({ ticker }: AiDiagnosisPanelProps) {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Sentiment Overview */}
+      {/* Overall Sentiment Overview */}
       {structuredData && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 rounded-xl bg-indigo-50">
-                <BrainCircuit size={18} className="text-indigo-600" />
+        <>
+          {/* 整體評分 + 建議 + 總結 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 rounded-xl bg-indigo-50">
+                  <BrainCircuit size={18} className="text-indigo-600" />
+                </div>
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">整體情緒評分</span>
               </div>
-              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">情緒評分</span>
+              <div className="flex items-end gap-2">
+                <span className="text-4xl font-black text-slate-900">{structuredData.score}</span>
+                <span className="text-sm font-bold text-slate-400 mb-1.5">/ 100</span>
+              </div>
+              <div className="mt-5">
+                <Progress 
+                  value={(structuredData.score + 100) / 2} 
+                  className={`h-2 rounded-full ${structuredData.score > 0 ? "[&>div]:bg-teal-500" : "[&>div]:bg-rose-500"}`}
+                />
+                <div className="flex justify-between mt-2">
+                  <span className="text-[10px] font-bold text-slate-300">極度悲觀</span>
+                  <span className="text-[10px] font-bold text-slate-300">極度樂觀</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-end gap-2">
-              <span className="text-4xl font-black text-slate-900">{structuredData.score}</span>
-              <span className="text-sm font-bold text-slate-400 mb-1.5">/ 100</span>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 rounded-xl bg-teal-50">
+                  <TrendingUp size={18} className="text-teal-600" />
+                </div>
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">投資建議</span>
+              </div>
+              <div className={`text-3xl font-black flex items-center gap-2 ${
+                structuredData.recommendation === "買入" ? "text-teal-600" : 
+                structuredData.recommendation === "賣出" ? "text-rose-600" : "text-amber-500"
+              }`}>
+                {structuredData.recommendation === "買入" && <CheckCircle2 size={24} />}
+                {structuredData.recommendation === "賣出" && <AlertCircle size={24} />}
+                {structuredData.recommendation}
+              </div>
+              <p className="text-xs text-slate-400 mt-3 font-medium leading-relaxed">AI 模型根據即時數據判讀之建議</p>
             </div>
-            <div className="mt-5">
-              <Progress 
-                value={(structuredData.score + 100) / 2} 
-                className={`h-2 rounded-full ${structuredData.score > 0 ? "[&>div]:bg-teal-500" : "[&>div]:bg-rose-500"}`}
-              />
-              <div className="flex justify-between mt-2">
-                <span className="text-[10px] font-bold text-slate-300">極度悲觀</span>
-                <span className="text-[10px] font-bold text-slate-300">極度樂觀</span>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 rounded-xl bg-amber-50">
+                  <Newspaper size={18} className="text-amber-600" />
+                </div>
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">核心總結</span>
+              </div>
+              <div className="text-xl font-bold text-slate-900 leading-tight">
+                {structuredData.sentiment}
+              </div>
+              <div className="flex gap-2 mt-3">
+                <Quote size={12} className="text-slate-200 shrink-0" />
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">{structuredData.summary}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 rounded-xl bg-teal-50">
-                <TrendingUp size={18} className="text-teal-600" />
+          {/* 短中長期三維度評分 */}
+          {(structuredData.shortTermScore !== undefined || structuredData.midTermScore !== undefined || structuredData.longTermScore !== undefined) && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <BarChart3 size={16} className="text-slate-500" />
+                <h4 className="text-sm font-black text-slate-500 uppercase tracking-widest">多期間展望評分</h4>
               </div>
-              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">投資建議</span>
-            </div>
-            <div className={`text-3xl font-black flex items-center gap-2 ${
-              structuredData.recommendation === "買入" ? "text-teal-600" : 
-              structuredData.recommendation === "賣出" ? "text-rose-600" : "text-amber-500"
-            }`}>
-              {structuredData.recommendation === "買入" && <CheckCircle2 size={24} />}
-              {structuredData.recommendation === "賣出" && <AlertCircle size={24} />}
-              {structuredData.recommendation}
-            </div>
-            <p className="text-xs text-slate-400 mt-3 font-medium leading-relaxed">AI 模型根據即時數據判讀之建議</p>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 rounded-xl bg-amber-50">
-                <Newspaper size={18} className="text-amber-600" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <ScoreCard
+                  label="短期展望"
+                  sublabel="1–3 個月"
+                  score={structuredData.shortTermScore ?? 0}
+                  icon={<Clock size={16} className="text-blue-600" />}
+                  iconBg="bg-blue-50"
+                  iconColor="text-blue-600"
+                />
+                <ScoreCard
+                  label="中期展望"
+                  sublabel="3–12 個月"
+                  score={structuredData.midTermScore ?? 0}
+                  icon={<Calendar size={16} className="text-violet-600" />}
+                  iconBg="bg-violet-50"
+                  iconColor="text-violet-600"
+                />
+                <ScoreCard
+                  label="長期展望"
+                  sublabel="1 年以上"
+                  score={structuredData.longTermScore ?? 0}
+                  icon={<TrendingUp size={16} className="text-emerald-600" />}
+                  iconBg="bg-emerald-50"
+                  iconColor="text-emerald-600"
+                />
               </div>
-              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">核心總結</span>
             </div>
-            <div className="text-xl font-bold text-slate-900 leading-tight">
-              {structuredData.sentiment}
-            </div>
-            <div className="flex gap-2 mt-3">
-              <Quote size={12} className="text-slate-200 shrink-0" />
-              <p className="text-xs text-slate-500 font-medium leading-relaxed">{structuredData.summary}</p>
-            </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
 
       {/* Detailed Analysis */}

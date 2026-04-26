@@ -12,13 +12,21 @@ function isSecureRequest(req: Request) {
   if (req.protocol === "https") return true;
 
   const forwardedProto = req.headers["x-forwarded-proto"];
-  if (!forwardedProto) return false;
+  if (forwardedProto) {
+    const protoList = Array.isArray(forwardedProto)
+      ? forwardedProto
+      : forwardedProto.split(",");
+    if (protoList.some(proto => proto.trim().toLowerCase() === "https")) return true;
+  }
 
-  const protoList = Array.isArray(forwardedProto)
-    ? forwardedProto
-    : forwardedProto.split(",");
+  // Render 和其他代理平台可能使用 x-forwarded-ssl
+  const forwardedSsl = req.headers["x-forwarded-ssl"];
+  if (forwardedSsl === "on") return true;
 
-  return protoList.some(proto => proto.trim().toLowerCase() === "https");
+  // 如果是生產環境且沒有其他線索，預設為安全（Render 必定是 HTTPS）
+  if (process.env.NODE_ENV === "production") return true;
+
+  return false;
 }
 
 export function getSessionCookieOptions(
