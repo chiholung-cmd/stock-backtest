@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { AiAdvisorPanel } from "@/components/AiAdvisorPanel";
+import { AiAdvisorPanelV2 } from "@/components/AiAdvisorPanelV2";
 import { Sparkles, TrendingUp, Activity, Globe, Calculator, Zap, BarChart3, History, GitCompare, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -110,7 +110,7 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-tr from-teal-500/20 to-blue-500/20 blur-3xl rounded-[3rem] -z-10" />
               <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-white/50">
                 <div className="p-1">
-                  <AiAdvisorPanel />
+                  <AiAdvisorPanelV2 />
                 </div>
               </div>
             </div>
