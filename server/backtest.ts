@@ -53,6 +53,9 @@ export interface BacktestOutput {
   sharpeRatio: number;
   winRate: number;
   totalTrades: number;
+  totalProfit: number;
+  averageProfit: number;
+  finalAsset: number;
   equityCurve: EquityPoint[];
   buyAndHoldCurve?: any[];
   trades: TradeRecord[];
@@ -320,6 +323,10 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
   const stdDev = Math.sqrt(dailyReturns.map(x => Math.pow(x - avgReturn, 2)).reduce((a, b) => a + b, 0) / (dailyReturns.length || 1));
   const sharpeRatio = stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252) : 0;
 
+  // 計算總損益、平均損益、最終資產
+  const totalProfit = finalEquity - input.initialCapital;
+  const averageProfit = completedTrades.length > 0 ? totalProfit / completedTrades.length : 0;
+
   return {
     ticker: input.ticker,
     strategy: input.strategy,
@@ -331,6 +338,9 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     sharpeRatio,
     winRate,
     totalTrades: completedTrades.length,
+    totalProfit,
+    averageProfit,
+    finalAsset: finalEquity,
     equityCurve,
     buyAndHoldCurve,
     trades,
