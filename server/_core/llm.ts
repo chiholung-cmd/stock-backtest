@@ -211,17 +211,15 @@ const normalizeToolChoice = (
 };
 
 const resolveApiUrl = (apiKey: string) => {
-  // 1. 優先使用環境變數定義的 URL
   if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) {
     return `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`;
   }
   
-  // 2. 自動偵測 Key 類型 (Poe 專用)
+  // 特別處理 Poe Key
   if (apiKey.startsWith("fon.")) {
     return "https://api.poe.com/v1/chat/completions";
   }
 
-  // 3. 預設 OpenAI
   return "https://api.openai.com/v1/chat/completions";
 };
 
@@ -291,8 +289,6 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     model,
   } = params;
 
-  // 使用傳入的模型名稱，若無則預設為 gpt-4o-mini
-  // 注意：Poe API 可能需要特定的模型代碼，這裡先保留傳入的 model
   let targetModel = model || "gpt-4o-mini";
   
   const payload: Record<string, unknown> = {
@@ -326,11 +322,13 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const apiKey = ENV.forgeApiKey;
   const apiUrl = resolveApiUrl(apiKey);
 
-  console.log(`[LLM] Calling ${apiUrl} with model: ${targetModel}`);
+  console.log(`[LLM] Request URL: ${apiUrl}`);
+  console.log(`[LLM] Model: ${targetModel}`);
+  console.log(`[LLM] Key Prefix: ${apiKey.substring(0, 7)}...`);
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 秒超時
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
     
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -346,11 +344,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[LLM] Error ${response.status}:`, errorText);
+      console.error(`[LLM] HTTP Error ${response.status}:`, errorText);
       
-      // 如果是 Poe API 的 401，嘗試切換到 OpenAI 官方地址重試 (針對可能是 OpenAI Key 的情況)
+      // 針對 Poe Key 的自動降級嘗試
       if (response.status === 401 && apiUrl.includes("poe.com")) {
-        console.log("[LLM] Retrying with standard OpenAI endpoint...");
+        console.warn("[LLM] Poe node 401. Retrying with standard OpenAI node...");
         const retryResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -360,8 +358,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
           body: JSON.stringify(payload),
         });
         if (retryResponse.ok) {
+          console.log("[LLM] Retry success via OpenAI node.");
           return (await retryResponse.json()) as InvokeResult;
         }
+        console.error("[LLM] Retry also failed:", await retryResponse.text());
       }
 
       throw new Error(
@@ -370,10 +370,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     }
 
     const result = (await response.json()) as InvokeResult;
-    console.log(`[LLM] Success: received ${result.choices.length} choices`);
     return result;
   } catch (error) {
-    console.error("[LLM] Fetch error:", error);
+    console.error("[LLM] Critical Fetch Error:", error);
     throw error;
   }
 }
