@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Send, Sparkles, TrendingUp, AlertCircle, Calendar, MessageSquare } from "lucide-react";
+import { Loader2, Send, Sparkles, TrendingUp, AlertCircle, Calendar, MessageSquare, Play } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import ReactMarkdown from "react-markdown";
 import { useLocation } from "wouter";
@@ -126,10 +126,11 @@ export function AiAdvisorPanelV2() {
     }
   };
 
-  const handleStartBacktest = () => {
+  const handleStartBacktest = async () => {
     if (!parsedStrategy) return;
     const { ticker, strategy, params } = parsedStrategy;
-    navigate(`/backtest?ticker=${encodeURIComponent(ticker)}&strategy=${encodeURIComponent(strategy)}&params=${encodeURIComponent(JSON.stringify(params))}`);
+    // 導航到回測頁面並自動執行回測
+    navigate(`/backtest?ticker=${encodeURIComponent(ticker)}&strategy=${encodeURIComponent(strategy)}&autoRun=true`);
   };
 
   const handleReset = () => {
@@ -359,11 +360,11 @@ export function AiAdvisorPanelV2() {
             <Button
               onClick={handleStartBacktest}
               disabled={!parsedStrategy}
-              className="flex-1 bg-gradient-to-r from-teal-600 to-blue-600 text-white disabled:opacity-50"
-              title={!parsedStrategy ? "AI 未能解析出策略參數，請重新分析" : "前往回測頁面"}
+              className="flex-1 bg-gradient-to-r from-teal-600 to-blue-600 text-white disabled:opacity-50 hover:shadow-lg transition-shadow"
+              title={!parsedStrategy ? "AI 未能解析出策略參數，請重新分析" : "自動填充參數並執行回測"}
             >
-              <Send size={16} className="mr-2" />
-              開始回測
+              <Play size={16} className="mr-2" />
+              自動回測
             </Button>
           </>
         )}

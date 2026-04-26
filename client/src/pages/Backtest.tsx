@@ -8,6 +8,7 @@ import { StockSearchInput } from "@/components/StockSearchInput";
 import { TradeDetailsPanel } from "@/components/TradeDetailsPanel";
 import { AiDiagnosisPanel } from "@/components/AiDiagnosisPanel";
 import { StockComparisonPanel } from "@/components/StockComparisonPanel";
+import { EnhancedEquityChart } from "@/components/EnhancedEquityChart";
 import { toast } from "sonner";
 import {
   BarChart3, TrendingUp, TrendingDown, Zap, Activity,
@@ -223,10 +224,27 @@ export default function Backtest() {
     const params = new URLSearchParams(window.location.search);
     const tickerParam = params.get("ticker");
     const strategyParam = params.get("strategy");
+    const autoRunParam = params.get("autoRun");
+    const paramsParam = params.get("params");
 
     if (tickerParam) setTicker(tickerParam);
     if (strategyParam && STRATEGIES.find(s => s.id === strategyParam)) {
       setStrategy(strategyParam as Strategy);
+    }
+    if (paramsParam) {
+      try {
+        const parsedParams = JSON.parse(decodeURIComponent(paramsParam));
+        setParams(parsedParams);
+      } catch (e) {
+        console.error("Failed to parse params", e);
+      }
+    }
+
+    // 如果 autoRun=true，自動執行回測
+    if (autoRunParam === "true") {
+      setTimeout(() => {
+        handleRun();
+      }, 500);
     }
   }, []);
 
@@ -606,27 +624,7 @@ export default function Backtest() {
 
                 <TabsContent value="chart" className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">資產增長曲線</h3>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <AreaChart data={result.equityCurve}>
-                      <defs>
-                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0d9488" stopOpacity={0.15}/>
-                          <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
-                      <XAxis dataKey="date" hide />
-                      <YAxis hide domain={['auto', 'auto']} />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '12px' }}
-                        formatter={(val: number) => [`${currency} ${val.toFixed(2)}`, '淨值']}
-                      />
-                      <Area type="monotone" dataKey="value" name="AI 策略" stroke="#0d9488" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
-                      {result.buyAndHoldCurve && (
-                        <Area type="monotone" dataKey="buyHoldValue" name="買入持有" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" fill="none" />
-                      )}
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <EnhancedEquityChart data={result.equityCurve} trades={result.trades} currency={currency} />
                 </TabsContent>
 
                 {mode === "portfolio" && result.assetPerformance && (
