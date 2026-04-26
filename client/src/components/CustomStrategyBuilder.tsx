@@ -26,9 +26,9 @@ export function CustomStrategyBuilder({ onStrategyCreate }: CustomStrategyBuilde
   });
   const [paramName, setParamName] = useState("");
   const [paramLabel, setParamLabel] = useState("");
-  const [paramMin, setParamMin] = useState(0);
-  const [paramMax, setParamMax] = useState(100);
-  const [paramValue, setParamValue] = useState(50);
+  const [paramMin, setParamMin] = useState<number>(0);
+  const [paramMax, setParamMax] = useState<number>(100);
+  const [paramValue, setParamValue] = useState<number>(50);
 
   const handleAddParam = () => {
     if (!paramName.trim()) return;
@@ -135,40 +135,34 @@ export function CustomStrategyBuilder({ onStrategyCreate }: CustomStrategyBuilde
             placeholder="參數名稱（英文）"
             value={paramName}
             onChange={(e) => setParamName(e.target.value)}
-            size="sm"
           />
           <Input
             placeholder="參數標籤（中文）"
             value={paramLabel}
             onChange={(e) => setParamLabel(e.target.value)}
-            size="sm"
           />
           <div className="grid grid-cols-3 gap-2">
             <Input
               type="number"
               placeholder="最小值"
-              value={paramMin}
+              value={String(paramMin)}
               onChange={(e) => setParamMin(Number(e.target.value))}
-              size="sm"
             />
             <Input
               type="number"
               placeholder="最大值"
-              value={paramMax}
+              value={String(paramMax)}
               onChange={(e) => setParamMax(Number(e.target.value))}
-              size="sm"
             />
             <Input
               type="number"
               placeholder="預設值"
-              value={paramValue}
+              value={String(paramValue)}
               onChange={(e) => setParamValue(Number(e.target.value))}
-              size="sm"
             />
           </div>
           <Button
             onClick={handleAddParam}
-            size="sm"
             variant="outline"
             className="w-full gap-2"
           >

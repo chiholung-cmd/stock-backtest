@@ -210,11 +210,18 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () => "https://api.openai.com/v1/chat/completions";
+const resolveApiUrl = () => {
+  // 優先使用自定義 API URL（如 Poe 代理）
+  if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) {
+    return `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`;
+  }
+  // 否則使用 OpenAI 官方 API
+  return "https://api.openai.com/v1/chat/completions";
+};
 
 const assertApiKey = () => {
   if (!ENV.forgeApiKey) {
-    throw new Error("API_KEY is not configured");
+    throw new Error("API_KEY is not configured. Please set POE_API_KEY or BUILT_IN_FORGE_API_KEY environment variable.");
   }
 };
 
@@ -278,10 +285,16 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     model,
   } = params;
 
-  // 對應模型名稱
+  // 使用傳入的模型名稱，若無則預設為 gpt-4o-mini
   let targetModel = model || "gpt-4o-mini";
-  if (targetModel.includes("gemini")) targetModel = "gpt-4o-mini";
-  if (targetModel.includes("claude")) targetModel = "gpt-4o-mini";
+  
+  // 模型名稱正規化（確保與 API 兼容）
+  if (targetModel.includes("gemini")) {
+    targetModel = "gpt-4o-mini"; // 如果要求 Gemini，改用 GPT-4o-mini
+  }
+  if (targetModel.includes("claude")) {
+    targetModel = "gpt-4o-mini"; // 如果要求 Claude，改用 GPT-4o-mini
+  }
 
   const payload: Record<string, unknown> = {
     model: targetModel,
@@ -311,21 +324,40 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetch(resolveApiUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  const apiUrl = resolveApiUrl();
+  const apiKey = ENV.forgeApiKey;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+  console.log(`[LLM] Calling ${apiUrl} with model: ${targetModel}`);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 秒超時
+    
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[LLM] Error ${response.status}:`, errorText);
+      throw new Error(
+        `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
+      );
+    }
+
+    const result = (await response.json()) as InvokeResult;
+    console.log(`[LLM] Success: received ${result.choices.length} choices`);
+    return result;
+  } catch (error) {
+    console.error("[LLM] Fetch error:", error);
+    throw error;
   }
-
-  return (await response.json()) as InvokeResult;
 }
