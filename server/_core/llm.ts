@@ -66,6 +66,7 @@ export type InvokeParams = {
   output_schema?: OutputSchema;
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
+  model?: string;
 };
 
 export type ToolCall = {
@@ -209,14 +210,11 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+const resolveApiUrl = () => "https://api.openai.com/v1/chat/completions";
 
 const assertApiKey = () => {
   if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+    throw new Error("API_KEY is not configured");
   }
 };
 
@@ -277,10 +275,16 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     output_schema,
     responseFormat,
     response_format,
+    model,
   } = params;
 
+  // 對應模型名稱
+  let targetModel = model || "gpt-4o-mini";
+  if (targetModel.includes("gemini")) targetModel = "gpt-4o-mini";
+  if (targetModel.includes("claude")) targetModel = "gpt-4o-mini";
+
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: targetModel,
     messages: messages.map(normalizeMessage),
   };
 
@@ -294,11 +298,6 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   );
   if (normalizedToolChoice) {
     payload.tool_choice = normalizedToolChoice;
-  }
-
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
   }
 
   const normalizedResponseFormat = normalizeResponseFormat({
