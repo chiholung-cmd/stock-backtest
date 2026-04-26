@@ -215,8 +215,8 @@ const resolveApiUrl = (apiKey: string) => {
     return `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`;
   }
   
-  // 特別處理 Poe Key
-  if (apiKey.startsWith("fon.")) {
+  // 特別處理 Poe Key (支持 sk-poe- 或 fon. 格式)
+  if (apiKey.startsWith("sk-poe-") || apiKey.startsWith("fon.")) {
     return "https://api.poe.com/v1/chat/completions";
   }
 
@@ -324,7 +324,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   console.log(`[LLM] Request URL: ${apiUrl}`);
   console.log(`[LLM] Model: ${targetModel}`);
-  console.log(`[LLM] Key Prefix: ${apiKey.substring(0, 7)}...`);
+  console.log(`[LLM] Key Prefix: ${apiKey.substring(0, 10)}...`);
 
   try {
     const controller = new AbortController();
