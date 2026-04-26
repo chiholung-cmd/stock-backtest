@@ -10,6 +10,7 @@ import {
   deleteBacktestResult,
 } from "./db";
 import { runBacktest } from "./backtest";
+import { runPortfolioBacktest } from "./portfolioBacktest";
 import { PoeApiWrapper } from "./poe";
 import { parseNaturalLanguageStrategy, optimizeStrategyParameters, generateStrategyRecommendations } from "./strategyOptimizer";
 
@@ -17,8 +18,14 @@ const poe = new PoeApiWrapper(process.env.POE_API_KEY || "");
 
 // ─── Strategy param schemas ───────────────────────────────────────────────────
 
-const RunBacktestInput = z.object({
+const PortfolioAsset = z.object({
   ticker: z.string().min(1).max(10).toUpperCase(),
+  weight: z.number().min(0).max(100),
+});
+
+const RunBacktestInput = z.object({
+  ticker: z.string().min(1).max(10).toUpperCase().optional(),
+  portfolio: z.array(PortfolioAsset).max(10).optional(),
   strategy: z.string(),
   params: z.record(z.string(), z.number()),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -29,8 +36,12 @@ const RunBacktestInput = z.object({
   contributePeriod: z.enum(["none", "weekly", "monthly", "quarterly"]).default("none"),
   redrawAmount: z.number().default(0),
   redrawPeriod: z.enum(["none", "weekly", "monthly", "quarterly"]).default("none"),
+  rebalancePeriod: z.enum(["none", "quarterly", "semi-annual", "annual"]).default("none"),
   saveResult: z.boolean().default(false),
-});
+}).refine(
+  (data) => data.ticker || (data.portfolio && data.portfolio.length > 0),
+  { message: "Must provide either ticker or portfolio" }
+);
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
@@ -121,19 +132,40 @@ export const appRouter = router({
     run: publicProcedure
       .input(RunBacktestInput)
       .mutation(async ({ input, ctx }) => {
-        const result = await runBacktest({
-          ticker: input.ticker,
-          strategy: input.strategy,
-          params: input.params,
-          startDate: input.startDate,
-          endDate: input.endDate,
-          timeframe: input.timeframe,
-          initialCapital: input.initialCapital,
-          contributeAmount: input.contributeAmount,
-          contributePeriod: input.contributePeriod,
-          redrawAmount: input.redrawAmount,
-          redrawPeriod: input.redrawPeriod,
-        });
+        let result;
+        
+        if (input.portfolio && input.portfolio.length > 0) {
+          // 投資組合模式
+          result = await runPortfolioBacktest({
+            portfolio: input.portfolio,
+            strategy: input.strategy,
+            params: input.params,
+            startDate: input.startDate,
+            endDate: input.endDate,
+            timeframe: input.timeframe,
+            initialCapital: input.initialCapital,
+            contributeAmount: input.contributeAmount,
+            contributePeriod: input.contributePeriod,
+            redrawAmount: input.redrawAmount,
+            redrawPeriod: input.redrawPeriod,
+            rebalancePeriod: input.rebalancePeriod || "none",
+          });
+        } else {
+          // 單標的模式
+          result = await runBacktest({
+            ticker: input.ticker!,
+            strategy: input.strategy,
+            params: input.params,
+            startDate: input.startDate,
+            endDate: input.endDate,
+            timeframe: input.timeframe,
+            initialCapital: input.initialCapital,
+            contributeAmount: input.contributeAmount,
+            contributePeriod: input.contributePeriod,
+            redrawAmount: input.redrawAmount,
+            redrawPeriod: input.redrawPeriod,
+          });
+        }
 
         if (input.saveResult && ctx.user) {
           await saveBacktestResult({
