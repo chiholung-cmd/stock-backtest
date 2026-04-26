@@ -23,7 +23,18 @@ export function TradeDetailsPanel({ trades, initialCapital, currency }: TradeDet
   // 計算統計數據
   const buyTrades = trades.filter(t => t.action === "BUY");
   const sellTrades = trades.filter(t => t.action === "SELL" || t.action === "SELL (Close)");
-  const totalPnL = sellTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+  
+  // 修正：後端傳回的 pnl 是百分比，需要轉換為金額
+  // 損益金額 = 賣出價格 * 數量 - 買入價格 * 數量
+  // 由於 Trade 對象中沒有直接存儲買入價格，我們從 balance 變化來推算或直接使用最後一筆 balance
+  const finalBalance = trades.length > 0 ? trades[trades.length - 1].balance : initialCapital;
+  
+  // 計算總投入資金 (初始資金 + 定期定額總額 - 定期提領總額)
+  const totalContributed = trades.filter(t => t.action === "CONTRIBUTE").reduce((sum, t) => sum + t.amount, 0);
+  const totalRedrawn = trades.filter(t => t.action === "REDRAW").reduce((sum, t) => sum + t.amount, 0);
+  const netInvestment = initialCapital + totalContributed - totalRedrawn;
+  
+  const totalPnL = finalBalance - netInvestment;
   const avgPnL = sellTrades.length > 0 ? totalPnL / sellTrades.length : 0;
 
   // 排序交易
@@ -91,7 +102,7 @@ export function TradeDetailsPanel({ trades, initialCapital, currency }: TradeDet
           <div className="text-center">
             <div className="text-xs font-bold text-slate-400 uppercase mb-1">最終資產</div>
             <div className="text-2xl font-black text-slate-900">
-              {formatCurrency(initialCapital + totalPnL)}
+              {formatCurrency(finalBalance)}
             </div>
           </div>
         </div>
@@ -185,7 +196,7 @@ export function TradeDetailsPanel({ trades, initialCapital, currency }: TradeDet
                           isProfitable ? "text-teal-700" : "text-rose-700"
                         }`}
                       >
-                        {isProfitable ? "+" : ""}{formatCurrency(trade.pnl)}
+                        {isProfitable ? "+" : ""}{(trade.pnl * 100).toFixed(2)}%
                       </div>
                     ) : (
                       <div className="text-xs text-slate-400">—</div>

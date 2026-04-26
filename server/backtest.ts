@@ -302,7 +302,13 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
 
   // Metrics Calculation
   const finalEquity = equityCurve[equityCurve.length - 1].value;
-  const totalReturn = (finalEquity - input.initialCapital) / input.initialCapital;
+  
+  // 計算總投入資金 (初始資金 + 定期定額總額 - 定期提領總額)
+  const totalContributed = trades.filter(t => t.action === "CONTRIBUTE").reduce((sum, t) => sum + t.amount, 0);
+  const totalRedrawn = trades.filter(t => t.action === "REDRAW").reduce((sum, t) => sum + t.amount, 0);
+  const netInvestment = input.initialCapital + totalContributed - totalRedrawn;
+  
+  const totalReturn = (finalEquity - netInvestment) / netInvestment;
   const days = data.length || 1;
   const annualizedReturn = Math.pow(1 + totalReturn, 252 / days) - 1;
 
@@ -323,14 +329,17 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
   // Sharpe Ratio
   const dailyReturns = [];
   for (let i = 1; i < equityCurve.length; i++) {
-    dailyReturns.push((equityCurve[i].value - equityCurve[i-1].value) / equityCurve[i-1].value);
+    if (equityCurve[i-1].value > 0) {
+      dailyReturns.push((equityCurve[i].value - equityCurve[i-1].value) / equityCurve[i-1].value);
+    }
   }
   const avgReturn = dailyReturns.reduce((a, b) => a + b, 0) / (dailyReturns.length || 1);
   const stdDev = Math.sqrt(dailyReturns.map(x => Math.pow(x - avgReturn, 2)).reduce((a, b) => a + b, 0) / (dailyReturns.length || 1));
   const sharpeRatio = stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252) : 0;
 
-  // 計算總損益、平均損益、最終資產
-  const totalProfit = finalEquity - input.initialCapital;
+  // 計算總損益、平均損益
+  // 注意：這裡的損益計算應基於交易日誌中的 pnl (百分比) 轉換為金額，以保持一致
+  const totalProfit = finalEquity - netInvestment;
   const averageProfit = completedTrades.length > 0 ? totalProfit / completedTrades.length : 0;
 
   return {
