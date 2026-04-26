@@ -11,7 +11,7 @@ interface Message {
 }
 
 export function AiAdvisorPanel() {
-  const [model, setModel] = useState<"claude" | "gpt" | "gemini">("claude");
+  const [model, setModel] = useState<string>("gemini-2.5-flash");
   const [goal, setGoal] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -112,17 +112,21 @@ export function AiAdvisorPanel() {
             選擇 AI 模型
           </label>
           <div className="flex gap-3">
-            {(["claude", "gpt", "gemini"] as const).map((m) => (
+            {[
+              { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+              { id: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+              { id: "gpt-4.1-nano", label: "GPT-4.1 Nano" }
+            ].map((m) => (
               <button
-                key={m}
-                onClick={() => setModel(m)}
+                key={m.id}
+                onClick={() => setModel(m.id)}
                 className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  model === m
+                  model === m.id
                     ? "bg-teal-600 text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                {m === "claude" ? "Claude 3" : m === "gpt" ? "GPT-4" : "Gemini"}
+                {m.label}
               </button>
             ))}
           </div>

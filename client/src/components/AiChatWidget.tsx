@@ -15,10 +15,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 const AI_MODELS = [
-  { value: "Claude-3-5-Sonnet", label: "Claude 3.5 Sonnet" },
-  { value: "GPT-4o", label: "GPT-4o" },
-  { value: "Gemini-1.5-Pro", label: "Gemini 1.5 Pro" },
-  { value: "Claude-3-Opus", label: "Claude 3 Opus" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+  { value: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
 ];
 
 interface ChatMessage {
@@ -32,7 +31,7 @@ export default function AiChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [selectedModel, setSelectedModel] = useState("Claude-3-5-Sonnet");
+  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -108,7 +107,7 @@ export default function AiChatWidget() {
 
       {/* Chat Panel */}
       {isOpen && (
-        <Card className="fixed bottom-24 right-6 z-40 w-96 max-h-96 flex flex-col shadow-2xl">
+        <Card className="fixed bottom-24 right-6 z-40 w-96 max-h-[500px] flex flex-col shadow-2xl">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-t-lg">
             <h3 className="font-semibold mb-2">AI Assistant</h3>
@@ -127,7 +126,7 @@ export default function AiChatWidget() {
           </div>
 
           {/* Messages Container */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 min-h-[300px]">
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-slate-500 text-sm">
                 <p>Ask me anything about stock backtesting!</p>
@@ -149,7 +148,7 @@ export default function AiChatWidget() {
                         : "bg-slate-200 text-slate-900 rounded-bl-none"
                     )}
                   >
-                    <p className="break-words">{message.content}</p>
+                    <p className="break-words whitespace-pre-wrap">{message.content}</p>
                   </div>
                 </div>
               ))

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { 
   BrainCircuit, 
@@ -22,20 +22,30 @@ export function AiDiagnosisPanel({ ticker }: AiDiagnosisPanelProps) {
   const [diagnosis, setDiagnosis] = useState<string | null>(null);
   const [structuredData, setStructuredData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const lastTickerRef = useRef<string>("");
 
   const diagnoseMutation = trpc.ai.diagnose.useMutation();
 
-  const handleDiagnose = async () => {
+  const handleDiagnose = async (force = false) => {
     if (!ticker) return;
+    
+    // 如果 ticker 沒變且不是強制刷新，且已經有診斷結果，就不重複分析
+    if (!force && ticker === lastTickerRef.current && diagnosis) {
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await diagnoseMutation.mutateAsync({ ticker });
       setDiagnosis(result.diagnosis);
+      lastTickerRef.current = ticker;
       
       // 嘗試解析 JSON
       const match = result.diagnosis.match(/```json\n([\s\S]*?)\n```/);
       if (match) {
         setStructuredData(JSON.parse(match[1]));
+      } else {
+        setStructuredData(null);
       }
     } catch (error) {
       console.error("Diagnosis failed:", error);
@@ -116,7 +126,7 @@ export function AiDiagnosisPanel({ ticker }: AiDiagnosisPanelProps) {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={handleDiagnose}
+            onClick={() => handleDiagnose(true)}
             className="text-slate-400 hover:text-teal-600"
           >
             <RefreshCw size={14} className="mr-2" />

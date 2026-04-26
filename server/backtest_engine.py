@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Stock Backtest Engine
-Supports: MA Crossover, RSI, MACD, Bollinger Bands
+Supports: MA Crossover, RSI, MACD, Bollinger Bands, KD, Price Action
 Data Source: Yahoo Finance (yfinance)
 """
 
@@ -243,6 +243,53 @@ def strategy_bollinger_bands(df: pd.DataFrame, params: dict):
     return df, signals
 
 
+# ─── Strategy: KD (Stochastic Oscillator) ──────────────────────────────────────
+
+def strategy_kd(df: pd.DataFrame, params: dict):
+    k_period = int(params.get("kPeriod", 9))
+    d_period = int(params.get("dPeriod", 3))
+    
+    df = df.copy()
+    low_min = df["Low"].rolling(window=k_period).min()
+    high_max = df["High"].rolling(window=k_period).max()
+    
+    df["rsv"] = 100 * (df["Close"] - low_min) / (high_max - low_min)
+    df["k"] = df["rsv"].ewm(com=2).mean() # Standard KD uses alpha=1/3
+    df["d"] = df["k"].ewm(com=2).mean()
+    df = df.dropna()
+    
+    signals = pd.Series(0, index=df.index)
+    prev_k = df["k"].shift(1)
+    prev_d = df["d"].shift(1)
+    
+    # K crosses above D → Buy
+    signals[(df["k"] > df["d"]) & (prev_k <= prev_d)] = 1
+    # K crosses below D → Sell
+    signals[(df["k"] < df["d"]) & (prev_k >= prev_d)] = -1
+    
+    return df, signals
+
+
+# ─── Strategy: Price Action (Simple Breakout) ──────────────────────────────────
+
+def strategy_breakout(df: pd.DataFrame, params: dict):
+    lookback = int(params.get("lookback", 20))
+    
+    df = df.copy()
+    df["high_max"] = df["High"].shift(1).rolling(window=lookback).max()
+    df["low_min"] = df["Low"].shift(1).rolling(window=lookback).min()
+    df = df.dropna()
+    
+    signals = pd.Series(0, index=df.index)
+    
+    # Price breaks above lookback high → Buy
+    signals[df["Close"] > df["high_max"]] = 1
+    # Price breaks below lookback low → Sell
+    signals[df["Close"] < df["low_min"]] = -1
+    
+    return df, signals
+
+
 # ─── Main Entry Point ─────────────────────────────────────────────────────────
 
 STRATEGIES = {
@@ -250,6 +297,8 @@ STRATEGIES = {
     "rsi": strategy_rsi,
     "macd": strategy_macd,
     "bollinger_bands": strategy_bollinger_bands,
+    "kd": strategy_kd,
+    "breakout": strategy_breakout,
 }
 
 
