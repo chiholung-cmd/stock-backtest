@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import ReactMarkdown from "react-markdown";
+import { Components } from "react-markdown";
 
 interface AiDiagnosisPanelProps {
   ticker: string;
@@ -265,7 +266,45 @@ export function AiDiagnosisPanel({ ticker }: AiDiagnosisPanelProps) {
         <div className="p-8">
           <div className="prose prose-slate max-w-none prose-headings:font-black prose-headings:text-slate-900 prose-p:text-slate-600 prose-p:leading-relaxed prose-strong:text-teal-700">
             {diagnosis ? (
-              <ReactMarkdown>{diagnosis.replace(/```json\n[\s\S]*?\n```/, "")}</ReactMarkdown>
+              <ReactMarkdown
+                components={{
+                  h3: ({node, ...props}) => (
+                    <div className="flex items-center gap-3 mt-10 mb-6 group">
+                      <div className="w-1.5 h-8 bg-teal-500 rounded-full group-hover:scale-y-110 transition-transform" />
+                      <h3 {...props} className="text-2xl font-black text-slate-900 m-0" />
+                    </div>
+                  ),
+                  h4: ({node, ...props}) => (
+                    <h4 {...props} className="text-lg font-bold text-slate-800 mt-8 mb-4 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-teal-400" />
+                      {props.children}
+                    </h4>
+                  ),
+                  p: ({node, ...props}) => (
+                    <p {...props} className="text-slate-600 leading-loose mb-6 text-[15px]" />
+                  ),
+                  ul: ({node, ...props}) => (
+                    <ul {...props} className="grid grid-cols-1 md:grid-cols-2 gap-3 my-6 list-none p-0" />
+                  ),
+                  li: ({node, ...props}) => (
+                    <li {...props} className="bg-slate-50/80 border border-slate-100 p-4 rounded-2xl text-sm font-medium text-slate-700 flex items-start gap-3 hover:bg-white hover:shadow-sm transition-all">
+                      <CheckCircle2 size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                      <span>{props.children}</span>
+                    </li>
+                  ),
+                  strong: ({node, ...props}) => (
+                    <strong {...props} className="text-teal-700 font-black bg-teal-50 px-1.5 py-0.5 rounded" />
+                  ),
+                  blockquote: ({node, ...props}) => (
+                    <div className="my-8 p-6 bg-gradient-to-br from-teal-50 to-indigo-50 rounded-3xl border border-teal-100 relative overflow-hidden">
+                      <Quote className="absolute -top-2 -left-2 w-12 h-12 text-teal-200/50 -rotate-12" />
+                      <blockquote {...props} className="relative z-10 italic text-teal-900 font-medium border-none p-0 m-0" />
+                    </div>
+                  )
+                }}
+              >
+                {diagnosis.replace(/```json\n[\s\S]*?\n```/, "")}
+              </ReactMarkdown>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">

@@ -58,7 +58,7 @@ export interface BacktestOutput {
   averageProfit: number;
   finalAsset: number;
   equityCurve: EquityPoint[];
-  buyAndHoldCurve?: any[];
+  buyAndHoldCurve?: EquityPoint[];
   trades: TradeRecord[];
 }
 
@@ -288,14 +288,14 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
   }
 
   // Calculate Buy & Hold Curve for comparison
-  const buyAndHoldCurve = [];
+  const buyAndHoldCurve: EquityPoint[] = [];
   if (data.length > 0) {
     const firstPrice = data[0].close;
     const initialShares = input.initialCapital / firstPrice;
     for (const d of data) {
       buyAndHoldCurve.push({
         date: d.date,
-        buyHoldValue: initialShares * d.close
+        value: initialShares * d.close
       });
     }
   }
