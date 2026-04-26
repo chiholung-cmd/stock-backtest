@@ -19,7 +19,7 @@ export default function Home() {
             <span className="font-black text-slate-900 text-xl tracking-tight">AlphaTest</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/backtest" className="text-sm font-semibold text-slate-600 hover:text-teal-600 transition-colors">回測</Link>
+            <Link href="/ai-advisor" className="text-sm font-semibold text-slate-600 hover:text-teal-600 transition-colors">回測</Link>
             <Link href="/history" className="text-sm font-semibold text-slate-600 hover:text-teal-600 transition-colors">歷史記錄</Link>
             <Link href="/compare" className="text-sm font-semibold text-slate-600 hover:text-teal-600 transition-colors">比較分析</Link>
           </div>
@@ -27,7 +27,7 @@ export default function Home() {
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-slate-500 hidden sm:inline">{user?.name}</span>
-                <Link href="/backtest">
+                <Link href="/ai-advisor">
                   <Button size="sm" className="bg-slate-900 text-white hover:bg-slate-800 rounded-full px-5">開始回測</Button>
                 </Link>
               </div>
@@ -90,7 +90,7 @@ export default function Home() {
               </div>
 
               <div className="pt-4 flex items-center gap-6">
-                <Link href="/backtest">
+                <Link href="/ai-advisor">
                   <Button size="lg" className="bg-slate-900 text-white hover:bg-slate-800 rounded-2xl px-8 py-7 text-lg font-bold group">
                     立即開始
                     <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />

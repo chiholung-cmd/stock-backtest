@@ -68,6 +68,7 @@ export function AiAdvisorPanelV2() {
   const [monthlyContribution, setMonthlyContribution] = useState("1000");
   const [investmentHorizon, setInvestmentHorizon] = useState("5");
   const [customGoal, setCustomGoal] = useState("");
+  const [preferredStocks, setPreferredStocks] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [parsedStrategy, setParsedStrategy] = useState<{ ticker: string; strategy: string; params: Record<string, number> } | null>(null);
@@ -79,7 +80,7 @@ export function AiAdvisorPanelV2() {
 
     if (inputMode === "freeform") {
       if (!customGoal.trim()) return;
-      goalText = customGoal.trim();
+      goalText = `偏好股票: ${preferredStocks}\n\n${customGoal.trim()}`;
     } else {
       if (!expectedReturn || !maxDrawdown || !monthlyContribution) return;
       goalText = `
@@ -254,7 +255,18 @@ export function AiAdvisorPanelV2() {
                 </div>
               </>
             ) : (
-              <div>
+                              <div className="mb-4">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    偏好市場/股票 (最多 10 個)
+                  </label>
+                  <Input
+                    placeholder="例如: AAPL, TSLA, QQQ, 0050.TW"
+                    value={preferredStocks}
+                    onChange={(e) => setPreferredStocks(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+                <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   描述您的投資目標
                 </label>
