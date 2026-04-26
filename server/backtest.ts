@@ -27,6 +27,7 @@ export interface TradeRecord {
 export interface EquityPoint {
   date: string;
   value: number;
+  buyHoldValue?: number;
 }
 
 export interface BacktestInput {
@@ -275,7 +276,7 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
 
     // IMPORTANT: 每日資產淨值必須在當天所有交易執行完後計算
     const dailyBalance = cash + shares * price;
-    equityCurve.push({ date, value: dailyBalance });
+    equityCurve.push({ date, value: dailyBalance, buyHoldValue: 0 }); // 稍後會填充
   }
 
   // Close final position for reporting
@@ -287,16 +288,17 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     trades.push({ date: data[data.length - 1].date, year, action: "SELL (Close)", price: lastPrice, amount: shares, pnl: pnlPercent, balance: finalBalance });
   }
 
-  // Calculate Buy & Hold Curve for comparison
-  const buyAndHoldCurve: EquityPoint[] = [];
+  // Calculate Buy & Hold Curve for comparison and merge into equityCurve
   if (data.length > 0) {
     const firstPrice = data[0].close;
     const initialShares = input.initialCapital / firstPrice;
+    const bhMap = new Map<string, number>();
     for (const d of data) {
-      buyAndHoldCurve.push({
-        date: d.date,
-        value: initialShares * d.close
-      });
+      bhMap.set(d.date, initialShares * d.close);
+    }
+    // 將 buyHoldValue 填充到 equityCurve
+    for (const point of equityCurve) {
+      point.buyHoldValue = bhMap.get(point.date) || 0;
     }
   }
 
@@ -357,7 +359,6 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     averageProfit,
     finalAsset: finalEquity,
     equityCurve,
-    buyAndHoldCurve,
     trades,
   };
 }
