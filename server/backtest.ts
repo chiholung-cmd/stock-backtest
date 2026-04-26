@@ -139,6 +139,7 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
 
   let cash = input.initialCapital;
   let shares = 0;
+  let lastBuyPrice = 0; // 追蹤最後買入價格以計算 PnL
   const trades: TradeRecord[] = [];
   const equityCurve: EquityPoint[] = [];
 
@@ -165,14 +166,16 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     // Handle Contribution
     if (isContributeTime(date, i)) {
       cash += input.contributeAmount;
-      trades.push({ date, action: "CONTRIBUTE", price, amount: input.contributeAmount, pnl: null, balance: cash + shares * price });
+      const balance = cash + shares * price;
+      trades.push({ date, action: "CONTRIBUTE", price, amount: input.contributeAmount, pnl: null, balance });
     }
 
     // Handle Redraw
     if (isRedrawTime(date, i)) {
       const actualRedraw = Math.min(input.redrawAmount, cash);
       cash -= actualRedraw;
-      trades.push({ date, action: "REDRAW", price, amount: actualRedraw, pnl: null, balance: cash + shares * price });
+      const balance = cash + shares * price;
+      trades.push({ date, action: "REDRAW", price, amount: actualRedraw, pnl: null, balance });
     }
 
     // Signals (Simplified combination logic)
@@ -196,21 +199,37 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
       sellSignal = rsiSell;
     }
 
-    if (buySignal && cash > 0) {
+    if (buySignal && cash > 0 && shares === 0) {
       const buyShares = Math.floor(cash / price);
       if (buyShares > 0) {
-        shares += buyShares;
+        shares = buyShares;
+        lastBuyPrice = price;
         cash -= buyShares * price;
-        trades.push({ date, action: "BUY", price, amount: buyShares, pnl: null, balance: cash + shares * price });
+        const balance = cash + shares * price;
+        trades.push({ date, action: "BUY", price, amount: buyShares, pnl: null, balance });
       }
     } else if (sellSignal && shares > 0) {
-      const pnl = (price - trades[trades.length - 1].price) * shares;
+      const pnl = shares * (price - lastBuyPrice); // 計算絕對 PnL
+      const pnlPercent = (price - lastBuyPrice) / lastBuyPrice; // 計算百分比 PnL
       cash += shares * price;
-      trades.push({ date, action: "SELL", price, amount: shares, pnl, balance: cash });
+      const balance = cash;
+      trades.push({ date, action: "SELL", price, amount: shares, pnl: pnlPercent, balance });
       shares = 0;
+      lastBuyPrice = 0;
     }
 
-    equityCurve.push({ date, value: cash + shares * price });
+    // 記錄每日資產淨值（現金 + 持股市值）
+    const dailyBalance = cash + shares * price;
+    equityCurve.push({ date, value: dailyBalance });
+  }
+
+  // Close final position
+  if (shares > 0) {
+    const lastPrice = data[data.length - 1].close;
+    const pnlPercent = (lastPrice - lastBuyPrice) / lastBuyPrice;
+    cash += shares * lastPrice;
+    trades.push({ date: data[data.length - 1].date, action: "SELL (Close)", price: lastPrice, amount: shares, pnl: pnlPercent, balance: cash });
+    shares = 0;
   }
 
   // Calculate Buy & Hold Curve for comparison
@@ -224,14 +243,6 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
         buyHoldValue: initialShares * d.close
       });
     }
-  }
-
-  // Close final position
-  if (shares > 0) {
-    const lastPrice = data[data.length - 1].close;
-    cash += shares * lastPrice;
-    trades.push({ date: data[data.length - 1].date, action: "SELL (Close)", price: lastPrice, amount: shares, pnl: null, balance: cash });
-    shares = 0;
   }
 
   // Metrics Calculation
