@@ -22,7 +22,7 @@ import {
   ResponsiveContainer, Legend, ComposedChart, Bar
 } from "recharts";
 
-type Strategy = "ma_crossover" | "rsi" | "macd" | "bollinger_bands";
+type Strategy = "ma_crossover" | "rsi" | "macd" | "bollinger_bands" | "bb_breakout" | "macd_divergence" | "dual_rsi";
 type Mode = "single" | "portfolio";
 
 interface PortfolioAsset {
@@ -101,6 +101,40 @@ const STRATEGIES = [
     params: [
       { key: "period", label: "均線週期", min: 5, max: 100, default: 20, step: 1 },
       { key: "stdDev", label: "標準差倍數", min: 0.5, max: 4, default: 2, step: 0.1 },
+    ],
+  },
+  {
+    id: "bb_breakout" as Strategy,
+    name: "布林帶突破",
+    description: "價格突破上軌買入，突破下軌賣出（反向操作）",
+    color: "#ec4899",
+    params: [
+      { key: "period", label: "均線週期", min: 5, max: 100, default: 20, step: 1 },
+      { key: "stdDev", label: "標準差倍數", min: 0.5, max: 4, default: 2, step: 0.1 },
+      { key: "threshold", label: "突破幅度 (%)", min: 0.1, max: 5, default: 1, step: 0.1 },
+    ],
+  },
+  {
+    id: "macd_divergence" as Strategy,
+    name: "MACD 背離",
+    description: "偵測 MACD 與價格的背離，進行反向交易",
+    color: "#06b6d4",
+    params: [
+      { key: "fastPeriod", label: "快線週期 (EMA)", min: 2, max: 50, default: 12, step: 1 },
+      { key: "slowPeriod", label: "慢線週期 (EMA)", min: 5, max: 100, default: 26, step: 1 },
+      { key: "signalPeriod", label: "信號線週期", min: 2, max: 30, default: 9, step: 1 },
+    ],
+  },
+  {
+    id: "dual_rsi" as Strategy,
+    name: "雙 RSI",
+    description: "使用兩個不同週期的 RSI 進行多層次確認",
+    color: "#14b8a6",
+    params: [
+      { key: "fastPeriod", label: "快速 RSI 週期", min: 2, max: 30, default: 7, step: 1 },
+      { key: "slowPeriod", label: "慢速 RSI 週期", min: 10, max: 50, default: 21, step: 1 },
+      { key: "oversold", label: "超賣閾值", min: 10, max: 45, default: 30, step: 1 },
+      { key: "overbought", label: "超買閾值", min: 55, max: 90, default: 70, step: 1 },
     ],
   },
 ];
@@ -214,6 +248,11 @@ export default function Backtest() {
   const [endDate, setEndDate] = useState("2024-01-01");
   const [timeframe, setTimeframe] = useState<"1d" | "1wk" | "1mo">("1d");
   const [rebalancePeriod, setRebalancePeriod] = useState<"none" | "quarterly" | "semi-annual" | "annual">("none");
+
+  // DCA (定期定額投資) 設置
+  const [dcaEnabled, setDcaEnabled] = useState(false);
+  const [dcaAmount, setDcaAmount] = useState(1000);
+  const [dcaPeriod, setDcaPeriod] = useState<"monthly" | "quarterly" | "semi-annual" | "annual">("monthly");
 
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -540,6 +579,48 @@ export default function Backtest() {
                       </select>
                     </div>
                   )}
+                  
+                  {/* DCA 定期定額投資 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="dca-toggle"
+                        checked={dcaEnabled}
+                        onChange={e => setDcaEnabled(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 cursor-pointer"
+                      />
+                      <Label htmlFor="dca-toggle" className="text-[10px] font-black text-slate-400 uppercase cursor-pointer">啟用定期定額投資 (DCA)</Label>
+                    </div>
+                    {dcaEnabled && (
+                      <div className="space-y-2 bg-slate-50 p-3 rounded-lg">
+                        <div>
+                          <Label className="text-[10px] font-bold text-slate-600">投入金額 ($)</Label>
+                          <Input
+                            type="number"
+                            value={dcaAmount}
+                            onChange={e => setDcaAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                            min="0"
+                            step="100"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] font-bold text-slate-600">投入頻率</Label>
+                          <select
+                            value={dcaPeriod}
+                            onChange={e => setDcaPeriod(e.target.value as any)}
+                            className="w-full h-8 rounded-lg border border-slate-100 bg-white px-2 text-xs font-bold text-slate-700 focus:outline-none"
+                          >
+                            <option value="monthly">每月</option>
+                            <option value="quarterly">每季度</option>
+                            <option value="semi-annual">每半年</option>
+                            <option value="annual">每年</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
