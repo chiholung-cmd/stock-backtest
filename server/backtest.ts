@@ -15,7 +15,8 @@ export interface OHLCVRow {
 }
 
 export interface TradeRecord {
-  date: string;
+  date: string; // YYYY-MM-DD
+  year?: number; // 提取的年份，便於前端按年份分組
   action: "BUY" | "SELL" | "SELL (Close)" | "CONTRIBUTE" | "REDRAW";
   price: number;
   amount: number;
@@ -195,11 +196,12 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     const price = data[i].close;
     const date = data[i].date;
 
-    // Handle Contribution
+      // Handle Contribute
     if (isContributeTime(i)) {
       cash += input.contributeAmount;
       const balance = cash + shares * price;
-      trades.push({ date, action: "CONTRIBUTE", price, amount: input.contributeAmount, pnl: null, balance });
+      const year = new Date(date).getFullYear();
+      trades.push({ date, year, action: "CONTRIBUTE", price, amount: input.contributeAmount, pnl: null, balance });
     }
 
     // Handle Redraw
@@ -207,7 +209,8 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
       const actualRedraw = Math.min(input.redrawAmount, cash);
       cash -= actualRedraw;
       const balance = cash + shares * price;
-      trades.push({ date, action: "REDRAW", price, amount: actualRedraw, pnl: null, balance });
+      const year = new Date(date).getFullYear();
+      trades.push({ date, year, action: "REDRAW", price, amount: actualRedraw, pnl: null, balance });
     }
 
     // Signal Logic
@@ -257,13 +260,15 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
         lastBuyPrice = price;
         cash -= buyShares * price;
         const balance = cash + shares * price;
-        trades.push({ date, action: "BUY", price, amount: buyShares, pnl: null, balance });
+        const year = new Date(date).getFullYear();
+        trades.push({ date, year, action: "BUY", price, amount: buyShares, pnl: null, balance });
       }
     } else if (sellSignal && shares > 0) {
       const pnlPercent = (price - lastBuyPrice) / lastBuyPrice;
       cash += shares * price;
       const balance = cash;
-      trades.push({ date, action: "SELL", price, amount: shares, pnl: pnlPercent, balance });
+      const year = new Date(date).getFullYear();
+      trades.push({ date, year, action: "SELL", price, amount: shares, pnl: pnlPercent, balance });
       shares = 0;
       lastBuyPrice = 0;
     }
@@ -278,7 +283,8 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     const lastPrice = data[data.length - 1].close;
     const pnlPercent = (lastPrice - lastBuyPrice) / lastBuyPrice;
     const finalBalance = cash + shares * lastPrice;
-    trades.push({ date: data[data.length - 1].date, action: "SELL (Close)", price: lastPrice, amount: shares, pnl: pnlPercent, balance: finalBalance });
+    const year = new Date(data[data.length - 1].date).getFullYear();
+    trades.push({ date: data[data.length - 1].date, year, action: "SELL (Close)", price: lastPrice, amount: shares, pnl: pnlPercent, balance: finalBalance });
   }
 
   // Calculate Buy & Hold Curve for comparison
