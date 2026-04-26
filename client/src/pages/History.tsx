@@ -177,7 +177,7 @@ export default function History() {
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {results.map((r) => {
+              {results.map((r: any) => {
                 const isSelected = selectedIds.has(r.id);
                 const strategyColor = STRATEGY_COLORS[r.strategy] ?? "oklch(0.52 0.18 195)";
                 const annReturn = r.annualizedReturn ?? 0;

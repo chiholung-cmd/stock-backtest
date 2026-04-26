@@ -248,9 +248,9 @@ export default function Backtest() {
       endDate,
       initialCapital,
       contributeAmount: contributePeriod === "none" ? 0 : contributeAmount,
-      contributePeriod,
+      contributePeriod: contributePeriod as any,
       redrawAmount: redrawPeriod === "none" ? 0 : redrawAmount,
-      redrawPeriod,
+      redrawPeriod: redrawPeriod as any,
     });
   };
 

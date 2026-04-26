@@ -15,7 +15,7 @@ import {
 
 interface ComparisonData {
   equityCurve: { date: string; value: number }[];
-  buyAndHoldCurve?: { date: string; buyHoldValue: number }[];
+  buyAndHoldCurve?: { date: string; value: number }[];
   annualizedReturn: number;
   maxDrawdown: number;
   sharpeRatio: number;
@@ -31,16 +31,16 @@ export function StockComparisonPanel({ data }: { data: ComparisonData }) {
       return { return: 0, maxDD: 0, sharpe: 0 };
     }
 
-    const first = data.buyAndHoldCurve[0].buyHoldValue;
-    const last = data.buyAndHoldCurve[data.buyAndHoldCurve.length - 1].buyHoldValue;
+    const first = data.buyAndHoldCurve[0].value;
+    const last = data.buyAndHoldCurve[data.buyAndHoldCurve.length - 1].value;
     const totalReturn = (last - first) / first;
 
     // 簡化計算
     let maxEquity = -Infinity;
     let maxDD = 0;
     for (const point of data.buyAndHoldCurve) {
-      if (point.buyHoldValue > maxEquity) maxEquity = point.buyHoldValue;
-      const dd = (maxEquity - point.buyHoldValue) / maxEquity;
+      if (point.value > maxEquity) maxEquity = point.value;
+      const dd = (maxEquity - point.value) / maxEquity;
       if (dd > maxDD) maxDD = dd;
     }
 
@@ -57,7 +57,7 @@ export function StockComparisonPanel({ data }: { data: ComparisonData }) {
   const mergedData = data.equityCurve.map((point, idx) => ({
     date: point.date,
     aiStrategy: point.value,
-    buyHold: data.buyAndHoldCurve?.[idx]?.buyHoldValue || 0
+    buyHold: data.buyAndHoldCurve?.[idx]?.value || 0
   }));
 
   // 計算日收益率對比

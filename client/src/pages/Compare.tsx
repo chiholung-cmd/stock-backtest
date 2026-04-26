@@ -52,7 +52,7 @@ type BacktestRecord = {
   totalTrades: number | null;
   equityCurve: unknown;
   trades: unknown;
-  createdAt: Date;
+  createdAt: Date | null;
   userId: number;
 };
 
@@ -305,7 +305,7 @@ export default function Compare() {
   const compareRecords = useMemo(() => {
     if (!allResults) return [];
     if (selectedIds.length > 0) {
-      return allResults.filter(r => selectedIds.includes(r.id));
+      return allResults.filter((r: any) => selectedIds.includes(r.id));
     }
     return allResults.slice(0, 5);
   }, [allResults, selectedIds]);

@@ -74,7 +74,7 @@ export function registerLocalAuthRoutes(app: Express): void {
         await createUser({ 
           email: normalizedEmail, 
           passwordHash, 
-          name: name?.trim() || null 
+          name: name?.trim() || undefined 
         });
         console.log(`[Auth] ✓ 資料庫寫入成功: ${normalizedEmail}`);
       } catch (dbErr: any) {

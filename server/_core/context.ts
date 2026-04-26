@@ -1,7 +1,8 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import { parse as parseCookieHeader } from "cookie";
 import { jwtVerify } from "jose";
-import type { User } from "../../drizzle/schema";
+import { users } from "../../drizzle/schema";
+export type User = typeof users.$inferSelect;
 import { getUserById } from "../db";
 import { COOKIE_NAME } from "../../shared/const";
 

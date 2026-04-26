@@ -56,20 +56,24 @@ export default function AiChatWidget() {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInput("");
     setIsLoading(true);
 
     try {
       const result = await chatMutation.mutateAsync({
-        message: input,
+        messages: newMessages.map(m => ({
+          role: m.role,
+          content: m.content
+        })),
         model: selectedModel,
       });
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: result.response,
+        content: result.reply,
         timestamp: new Date(),
       };
 

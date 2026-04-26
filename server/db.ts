@@ -4,7 +4,7 @@ import mysql from "mysql2/promise";
 import { users, backtestResults, aiConversations } from "../drizzle/schema";
 
 let _pool: mysql.Pool | null = null;
-let _db: ReturnType<typeof drizzle> | null = null;
+let _db: any = null;
 
 export async function getDbConnection() {
   if (!_pool && process.env.DATABASE_URL) {
