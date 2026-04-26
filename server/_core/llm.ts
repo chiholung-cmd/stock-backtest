@@ -210,18 +210,24 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () => {
-  // 優先使用自定義 API URL（如 Poe 代理）
+const resolveApiUrl = (apiKey: string) => {
+  // 1. 優先使用環境變數定義的 URL
   if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) {
     return `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`;
   }
-  // 否則使用 OpenAI 官方 API
+  
+  // 2. 自動偵測 Key 類型 (Poe 專用)
+  if (apiKey.startsWith("fon.")) {
+    return "https://api.poe.com/v1/chat/completions";
+  }
+
+  // 3. 預設 OpenAI
   return "https://api.openai.com/v1/chat/completions";
 };
 
 const assertApiKey = () => {
   if (!ENV.forgeApiKey) {
-    throw new Error("API_KEY is not configured. Please set POE_API_KEY or BUILT_IN_FORGE_API_KEY environment variable.");
+    throw new Error("API_KEY is not configured. Please set POE_API_KEY environment variable.");
   }
 };
 
@@ -286,16 +292,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   // 使用傳入的模型名稱，若無則預設為 gpt-4o-mini
+  // 注意：Poe API 可能需要特定的模型代碼，這裡先保留傳入的 model
   let targetModel = model || "gpt-4o-mini";
   
-  // 模型名稱正規化（確保與 API 兼容）
-  if (targetModel.includes("gemini")) {
-    targetModel = "gpt-4o-mini"; // 如果要求 Gemini，改用 GPT-4o-mini
-  }
-  if (targetModel.includes("claude")) {
-    targetModel = "gpt-4o-mini"; // 如果要求 Claude，改用 GPT-4o-mini
-  }
-
   const payload: Record<string, unknown> = {
     model: targetModel,
     messages: messages.map(normalizeMessage),
@@ -324,8 +323,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const apiUrl = resolveApiUrl();
   const apiKey = ENV.forgeApiKey;
+  const apiUrl = resolveApiUrl(apiKey);
 
   console.log(`[LLM] Calling ${apiUrl} with model: ${targetModel}`);
 
@@ -348,6 +347,23 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[LLM] Error ${response.status}:`, errorText);
+      
+      // 如果是 Poe API 的 401，嘗試切換到 OpenAI 官方地址重試 (針對可能是 OpenAI Key 的情況)
+      if (response.status === 401 && apiUrl.includes("poe.com")) {
+        console.log("[LLM] Retrying with standard OpenAI endpoint...");
+        const retryResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        if (retryResponse.ok) {
+          return (await retryResponse.json()) as InvokeResult;
+        }
+      }
+
       throw new Error(
         `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
       );

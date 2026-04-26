@@ -34,9 +34,28 @@ export const STRATEGIES: StrategyDefinition[] = [
     description: "RSI 突破超賣區買入，突破超買區賣出",
     color: "#f59e0b",
     params: [
-      { key: "period", label: "RSI 週期", min: 2, max: 50, default: 14, step: 1 },
+      { key: "rsiPeriod", label: "RSI 週期", min: 2, max: 50, default: 14, step: 1 },
       { key: "oversold", label: "超賣閾值", min: 10, max: 45, default: 30, step: 1 },
       { key: "overbought", label: "超買閾值", min: 55, max: 90, default: 70, step: 1 },
+    ],
+  },
+  {
+    id: "kd",
+    name: "KD 指標",
+    description: "K線上穿D線且在低位買入，高位下穿賣出",
+    color: "#ec4899",
+    params: [
+      { key: "kPeriod", label: "K 週期", min: 5, max: 50, default: 14, step: 1 },
+      { key: "dPeriod", label: "D 週期", min: 2, max: 20, default: 3, step: 1 },
+    ],
+  },
+  {
+    id: "breakout",
+    name: "突破策略",
+    description: "價格突破前高買入，跌破前低賣出",
+    color: "#06b6d4",
+    params: [
+      { key: "breakoutPeriod", label: "回溯週期", min: 5, max: 100, default: 20, step: 1 },
     ],
   },
   {
@@ -58,25 +77,6 @@ export const STRATEGIES: StrategyDefinition[] = [
     params: [
       { key: "period", label: "均線週期", min: 5, max: 100, default: 20, step: 1 },
       { key: "stdDev", label: "標準差倍數", min: 0.5, max: 4, default: 2, step: 0.1 },
-    ],
-  },
-  {
-    id: "kd",
-    name: "KD 指標",
-    description: "K線上穿D線買入，下穿賣出（隨機指標）",
-    color: "#ec4899",
-    params: [
-      { key: "kPeriod", label: "K 週期", min: 5, max: 50, default: 9, step: 1 },
-      { key: "dPeriod", label: "D 週期", min: 2, max: 20, default: 3, step: 1 },
-    ],
-  },
-  {
-    id: "breakout",
-    name: "突破策略",
-    description: "價格突破歷史高點買入，突破低點賣出",
-    color: "#06b6d4",
-    params: [
-      { key: "lookback", label: "回溯週期", min: 5, max: 100, default: 20, step: 1 },
     ],
   },
 ];

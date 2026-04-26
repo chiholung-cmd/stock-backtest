@@ -30,7 +30,7 @@ export interface EquityPoint {
 
 export interface BacktestInput {
   ticker: string;
-  strategy: string; // supports comma-separated for combinations: "ma_crossover,rsi"
+  strategy: string; 
   params: Record<string, number>;
   startDate: string;
   endDate: string;
@@ -126,6 +126,34 @@ function rsi(values: number[], period: number): (number | null)[] {
   return results;
 }
 
+function calculateStochastic(data: OHLCVRow[], kPeriod: number = 14, dPeriod: number = 3) {
+  const kValues: (number | null)[] = new Array(data.length).fill(null);
+  const dValues: (number | null)[] = new Array(data.length).fill(null);
+
+  for (let i = kPeriod - 1; i < data.length; i++) {
+    const slice = data.slice(i - kPeriod + 1, i + 1);
+    const low = Math.min(...slice.map(d => d.low ?? d.close));
+    const high = Math.max(...slice.map(d => d.high ?? d.close));
+    const currentClose = data[i].close;
+    
+    if (high !== low) {
+      kValues[i] = ((currentClose - low) / (high - low)) * 100;
+    } else {
+      kValues[i] = 50;
+    }
+  }
+
+  // Calculate D (SMA of K)
+  for (let i = kPeriod + dPeriod - 2; i < data.length; i++) {
+    const slice = kValues.slice(i - dPeriod + 1, i + 1).filter(v => v !== null) as number[];
+    if (slice.length === dPeriod) {
+      dValues[i] = slice.reduce((a, b) => a + b, 0) / dPeriod;
+    }
+  }
+
+  return { k: kValues, d: dValues };
+}
+
 // ─── Backtest Logic ───────────────────────────────────────────────────────────
 
 export async function runBacktest(input: BacktestInput): Promise<BacktestOutput> {
@@ -136,26 +164,27 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
   const maShort = sma(closes, input.params.shortPeriod || 10);
   const maLong = sma(closes, input.params.longPeriod || 30);
   const rsiVals = rsi(closes, input.params.rsiPeriod || 14);
+  const stoch = calculateStochastic(data, input.params.kPeriod || 14, input.params.dPeriod || 3);
 
   let cash = input.initialCapital;
   let shares = 0;
-  let lastBuyPrice = 0; // 追蹤最後買入價格以計算 PnL
+  let lastBuyPrice = 0; 
   const trades: TradeRecord[] = [];
   const equityCurve: EquityPoint[] = [];
 
-  const isContributeTime = (dateStr: string, index: number) => {
+  const isContributeTime = (index: number) => {
     if (input.contributePeriod === "none") return false;
-    if (input.contributePeriod === "weekly") return index % 5 === 0;
-    if (input.contributePeriod === "monthly") return index % 20 === 0;
-    if (input.contributePeriod === "quarterly") return index % 60 === 0;
+    if (input.contributePeriod === "weekly") return index > 0 && index % 5 === 0;
+    if (input.contributePeriod === "monthly") return index > 0 && index % 20 === 0;
+    if (input.contributePeriod === "quarterly") return index > 0 && index % 60 === 0;
     return false;
   };
 
-  const isRedrawTime = (dateStr: string, index: number) => {
+  const isRedrawTime = (index: number) => {
     if (input.redrawPeriod === "none") return false;
-    if (input.redrawPeriod === "weekly") return index % 5 === 0;
-    if (input.redrawPeriod === "monthly") return index % 20 === 0;
-    if (input.redrawPeriod === "quarterly") return index % 60 === 0;
+    if (input.redrawPeriod === "weekly") return index > 0 && index % 5 === 0;
+    if (input.redrawPeriod === "monthly") return index > 0 && index % 20 === 0;
+    if (input.redrawPeriod === "quarterly") return index > 0 && index % 60 === 0;
     return false;
   };
 
@@ -164,41 +193,60 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
     const date = data[i].date;
 
     // Handle Contribution
-    if (isContributeTime(date, i)) {
+    if (isContributeTime(i)) {
       cash += input.contributeAmount;
       const balance = cash + shares * price;
       trades.push({ date, action: "CONTRIBUTE", price, amount: input.contributeAmount, pnl: null, balance });
     }
 
     // Handle Redraw
-    if (isRedrawTime(date, i)) {
+    if (isRedrawTime(i)) {
       const actualRedraw = Math.min(input.redrawAmount, cash);
       cash -= actualRedraw;
       const balance = cash + shares * price;
       trades.push({ date, action: "REDRAW", price, amount: actualRedraw, pnl: null, balance });
     }
 
-    // Signals (Simplified combination logic)
-    const maBuy = maShort[i] !== null && maLong[i] !== null && maShort[i]! > maLong[i]! && maShort[i-1]! <= maLong[i-1]!;
-    const maSell = maShort[i] !== null && maLong[i] !== null && maShort[i]! < maLong[i]! && maShort[i-1]! >= maLong[i-1]!;
-    
-    const rsiBuy = rsiVals[i] !== null && rsiVals[i]! < (input.params.oversold || 30);
-    const rsiSell = rsiVals[i] !== null && rsiVals[i]! > (input.params.overbought || 70);
-
+    // Signal Logic
     let buySignal = false;
     let sellSignal = false;
 
-    if (input.strategy.includes("ma_crossover") && input.strategy.includes("rsi")) {
-      buySignal = maBuy && rsiBuy; // Combination: Both must be true
-      sellSignal = maSell || rsiSell; // Sell if either is true
-    } else if (input.strategy.includes("ma_crossover")) {
-      buySignal = maBuy;
-      sellSignal = maSell;
-    } else if (input.strategy.includes("rsi")) {
-      buySignal = rsiBuy;
-      sellSignal = rsiSell;
+    // 1. MA Crossover
+    const maBuy = i > 0 && maShort[i] !== null && maLong[i] !== null && maShort[i]! > maLong[i]! && maShort[i-1]! <= maLong[i-1]!;
+    const maSell = i > 0 && maShort[i] !== null && maLong[i] !== null && maShort[i]! < maLong[i]! && maShort[i-1]! >= maLong[i-1]!;
+    
+    // 2. RSI
+    const rsiBuy = rsiVals[i] !== null && rsiVals[i]! < (input.params.oversold || 30);
+    const rsiSell = rsiVals[i] !== null && rsiVals[i]! > (input.params.overbought || 70);
+
+    // 3. KD (Stochastic)
+    const kdBuy = i > 0 && stoch.k[i] !== null && stoch.d[i] !== null && stoch.k[i]! > stoch.d[i]! && stoch.k[i-1]! <= stoch.d[i-1]! && stoch.k[i]! < 20;
+    const kdSell = i > 0 && stoch.k[i] !== null && stoch.d[i] !== null && stoch.k[i]! < stoch.d[i]! && stoch.k[i-1]! >= stoch.d[i-1]! && stoch.k[i]! > 80;
+
+    // 4. Breakout (Price Action)
+    const lookback = input.params.breakoutPeriod || 20;
+    let breakoutBuy = false;
+    let breakoutSell = false;
+    if (i >= lookback) {
+      const pastHigh = Math.max(...closes.slice(i - lookback, i));
+      const pastLow = Math.min(...closes.slice(i - lookback, i));
+      breakoutBuy = price > pastHigh;
+      breakoutSell = price < pastLow;
     }
 
+    // Strategy Dispatch
+    const s = input.strategy.toLowerCase();
+    if (s.includes("ma_crossover")) {
+      buySignal = maBuy; sellSignal = maSell;
+    } else if (s.includes("rsi")) {
+      buySignal = rsiBuy; sellSignal = rsiSell;
+    } else if (s.includes("kd")) {
+      buySignal = kdBuy; sellSignal = kdSell;
+    } else if (s.includes("breakout")) {
+      buySignal = breakoutBuy; sellSignal = breakoutSell;
+    }
+
+    // Execute Trades
     if (buySignal && cash > 0 && shares === 0) {
       const buyShares = Math.floor(cash / price);
       if (buyShares > 0) {
@@ -209,8 +257,7 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
         trades.push({ date, action: "BUY", price, amount: buyShares, pnl: null, balance });
       }
     } else if (sellSignal && shares > 0) {
-      const pnl = shares * (price - lastBuyPrice); // 計算絕對 PnL
-      const pnlPercent = (price - lastBuyPrice) / lastBuyPrice; // 計算百分比 PnL
+      const pnlPercent = (price - lastBuyPrice) / lastBuyPrice;
       cash += shares * price;
       const balance = cash;
       trades.push({ date, action: "SELL", price, amount: shares, pnl: pnlPercent, balance });
@@ -218,18 +265,17 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
       lastBuyPrice = 0;
     }
 
-    // 記錄每日資產淨值（現金 + 持股市值）
+    // IMPORTANT: 每日資產淨值必須在當天所有交易執行完後計算
     const dailyBalance = cash + shares * price;
     equityCurve.push({ date, value: dailyBalance });
   }
 
-  // Close final position
+  // Close final position for reporting
   if (shares > 0) {
     const lastPrice = data[data.length - 1].close;
     const pnlPercent = (lastPrice - lastBuyPrice) / lastBuyPrice;
-    cash += shares * lastPrice;
-    trades.push({ date: data[data.length - 1].date, action: "SELL (Close)", price: lastPrice, amount: shares, pnl: pnlPercent, balance: cash });
-    shares = 0;
+    const finalBalance = cash + shares * lastPrice;
+    trades.push({ date: data[data.length - 1].date, action: "SELL (Close)", price: lastPrice, amount: shares, pnl: pnlPercent, balance: finalBalance });
   }
 
   // Calculate Buy & Hold Curve for comparison
@@ -246,7 +292,8 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
   }
 
   // Metrics Calculation
-  const totalReturn = (equityCurve[equityCurve.length - 1].value - input.initialCapital) / input.initialCapital;
+  const finalEquity = equityCurve[equityCurve.length - 1].value;
+  const totalReturn = (finalEquity - input.initialCapital) / input.initialCapital;
   const days = data.length || 1;
   const annualizedReturn = Math.pow(1 + totalReturn, 252 / days) - 1;
 
@@ -264,7 +311,7 @@ export async function runBacktest(input: BacktestInput): Promise<BacktestOutput>
   const winningTrades = completedTrades.filter(t => (t.pnl || 0) > 0);
   const winRate = completedTrades.length > 0 ? winningTrades.length / completedTrades.length : 0;
 
-  // Sharpe Ratio (Simplified: using daily returns std dev)
+  // Sharpe Ratio
   const dailyReturns = [];
   for (let i = 1; i < equityCurve.length; i++) {
     dailyReturns.push((equityCurve[i].value - equityCurve[i-1].value) / equityCurve[i-1].value);
