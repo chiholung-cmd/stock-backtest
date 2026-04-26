@@ -255,7 +255,8 @@ export function AiAdvisorPanelV2() {
                 </div>
               </>
             ) : (
-                              <div className="mb-4">
+              <>
+                <div className="mb-4">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     偏好市場/股票 (最多 10 個)
                   </label>
@@ -267,17 +268,18 @@ export function AiAdvisorPanelV2() {
                   />
                 </div>
                 <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  描述您的投資目標
-                </label>
-                <Textarea
-                  placeholder="例如：我想在 5 年內積累 100 萬美元，風險承受度中等，每月可投入 2000 美元，偏好科技股，希望了解適合的量化策略..."
-                  value={customGoal}
-                  onChange={(e) => setCustomGoal(e.target.value)}
-                  className="text-sm min-h-[140px] resize-none"
-                />
-                <p className="text-xs text-slate-400 mt-1">用自然語言描述您的投資需求，AI 將為您量身推薦策略</p>
-              </div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    描述您的投資目標
+                  </label>
+                  <Textarea
+                    placeholder="例如：我想在 5 年內積累 100 萬美元，風險承受度中等，每月可投入 2000 美元，偏好科技股，希望了解適合的量化策略..."
+                    value={customGoal}
+                    onChange={(e) => setCustomGoal(e.target.value)}
+                    className="text-sm min-h-[140px] resize-none"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">用自然語言描述您的投資需求，AI 將為您量身推薦策略</p>
+                </div>
+              </>
             )}
           </div>
         )}
