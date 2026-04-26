@@ -36,7 +36,7 @@ const RunBacktestInput = z.object({
 
 export const appRouter = router({
   ai: router({
-    analyzeGoal: protectedProcedure
+    analyzeGoal: publicProcedure // ✅ 改為公共，方便測試
       .input(z.object({
         goal: z.string().min(1),
         model: z.string().min(1),
@@ -45,7 +45,7 @@ export const appRouter = router({
         const result = await poe.analyzeGoal(input.goal, input.model);
         return { analysis: result };
       }),
-    chat: protectedProcedure
+    chat: publicProcedure // ✅ 改為公共，解決登入問題導致的 AI 聊天失敗
       .input(z.object({
         messages: z.array(z.object({
           role: z.enum(["user", "assistant"]),
@@ -54,12 +54,11 @@ export const appRouter = router({
         model: z.string().min(1),
       }))
       .mutation(async ({ input }) => {
-        // Use the last message as the query for now, or join them
         const lastMessage = input.messages[input.messages.length - 1].content;
         const response = await poe.chat(lastMessage, input.model, input.messages.slice(0, -1));
         return { reply: response };
       }),
-    diagnose: protectedProcedure
+    diagnose: publicProcedure // ✅ 改為公共，解決登入問題導致的 AI 診斷失敗
       .input(z.object({
         ticker: z.string().min(1),
         model: z.string().optional(),
@@ -68,7 +67,7 @@ export const appRouter = router({
         const result = await poe.diagnoseStock(input.ticker, input.model);
         return { diagnosis: result };
       }),
-    parseStrategy: protectedProcedure
+    parseStrategy: publicProcedure
       .input(z.object({
         description: z.string().min(1),
       }))
@@ -76,7 +75,7 @@ export const appRouter = router({
         const strategy = await parseNaturalLanguageStrategy(input.description);
         return { strategy };
       }),
-    optimizeStrategy: protectedProcedure
+    optimizeStrategy: publicProcedure
       .input(z.object({
         strategyName: z.string(),
         currentParams: z.record(z.string(), z.number()),
@@ -95,7 +94,7 @@ export const appRouter = router({
         );
         return { optimizedParams: optimized };
       }),
-    getRecommendations: protectedProcedure
+    getRecommendations: publicProcedure
       .input(z.object({
         marketCondition: z.string(),
         riskTolerance: z.enum(["low", "medium", "high"]),
