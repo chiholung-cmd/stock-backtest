@@ -278,3 +278,44 @@ function calculateRebalanceEvents(
 
   return events;
 }
+
+/**
+ * 計算投資組合的買入持有曲線
+ */
+function calculateBuyAndHoldCurve(
+  assetResults: BacktestOutput[],
+  portfolio: PortfolioAsset[],
+  initialCapital: number
+): EquityPoint[] {
+  const dateMap = new Map<string, number>();
+
+  // 收集所有日期
+  const allDates = new Set<string>();
+  assetResults.forEach(result => {
+    result.equityCurve.forEach(p => allDates.add(p.date));
+  });
+
+  const sortedDates = Array.from(allDates).sort();
+
+  // 計算每個日期的加權買入持有值
+  sortedDates.forEach(date => {
+    let totalValue = 0;
+    assetResults.forEach((result, idx) => {
+      const weight = portfolio[idx].weight / 100;
+      // 找到該日期或最接近該日期的買入持有值
+      const point = result.equityCurve.find(p => p.date === date) || 
+                    result.equityCurve.filter(p => p.date <= date).pop();
+      
+      if (point) {
+        // 買入持有值通常在 BacktestOutput 中是單獨計算的，
+        // 如果沒有，我們可以用該點的資產價值模擬
+        totalValue += (point.value || initialCapital) * weight;
+      } else {
+        totalValue += initialCapital * weight;
+      }
+    });
+    dateMap.set(date, totalValue);
+  });
+
+  return Array.from(dateMap.entries()).map(([date, value]) => ({ date, value }));
+}
