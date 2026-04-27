@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import {
   BarChart3, TrendingUp, TrendingDown, Zap, Activity,
   Play, Save, ArrowLeft, Info, Globe, Calculator, BrainCircuit,
-  Plus, X, AlertCircle
+  Plus, X, AlertCircle, Loader2
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "wouter";
@@ -256,8 +256,121 @@ export default function Backtest() {
 
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isPlanning, setIsPlanning] = useState(false);
+  const [shareToken, setShareToken] = useState<string | null>(null);
+
+  const generatePlanMutation = trpc.goalPlanning.generatePlan.useMutation();
+  const optimizeMutation = trpc.strategyOptimization.optimizeWithGA.useMutation();
+  const optimizePortfolioMutation = trpc.portfolioOptimization.optimizeWeights.useMutation();
+  const createShareLinkMutation = trpc.sharing.createShareLink.useMutation();
 
   const selectedStrategy = STRATEGIES.find(s => s.id === strategy);
+
+  const handleGoalPlan = async () => {
+    setIsPlanning(true);
+    try {
+      const plans = await generatePlanMutation.mutateAsync({
+        targetAnnualReturn: 0.15,
+        monthlyContribution: 5000,
+        investmentPeriod: 5,
+        initialCapital,
+        riskTolerance: "moderate",
+        startDate,
+        endDate,
+      });
+      if (plans && plans.length > 0) {
+        const best = plans[0];
+        if (best.portfolioComposition) {
+          setMode("portfolio");
+          setPortfolio(best.portfolioComposition.map(a => ({ ticker: a.ticker, weight: a.weight * 100 })));
+        }
+        setStrategy(best.strategy.id as Strategy);
+        setParams(best.strategy.params);
+        toast.success("已根據您的目標自動配置最佳方案！");
+      }
+    } catch (e) {
+      toast.error("規劃失敗");
+    } finally {
+      setIsPlanning(false);
+    }
+  };
+
+  const handleOptimizeParams = async () => {
+    setIsOptimizing(true);
+    try {
+      const paramRanges: Record<string, [number, number]> = {};
+      selectedStrategy?.params.forEach(p => {
+        paramRanges[p.key] = [p.min, p.max];
+      });
+
+      const bestParams = await optimizeMutation.mutateAsync({
+        ticker,
+        strategy,
+        paramRanges,
+        startDate,
+        endDate,
+      });
+      setParams(bestParams);
+      toast.success("策略參數已自動優化！");
+    } catch (e) {
+      toast.error("優化失敗");
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  const handleOptimizePortfolio = async () => {
+    setIsOptimizing(true);
+    try {
+      const tickers = portfolio.map(p => p.ticker);
+      const expectedReturns: Record<string, number> = {};
+      const volatilities: Record<string, number> = {};
+      const correlation: Record<string, Record<string, number>> = {};
+      
+      tickers.forEach(t => {
+        expectedReturns[t] = 0.12; 
+        volatilities[t] = 0.2;
+        correlation[t] = {};
+        tickers.forEach(t2 => {
+          correlation[t][t2] = t === t2 ? 1 : 0.5;
+        });
+      });
+
+      const bestWeights = await optimizePortfolioMutation.mutateAsync({
+        tickers,
+        expectedReturns,
+        volatilities,
+        correlation
+      });
+      
+      setPortfolio(portfolio.map(p => ({
+        ...p,
+        weight: (bestWeights[p.ticker] || 0) * 100
+      })));
+      toast.success("投資組合權重已優化！");
+    } catch (e) {
+      toast.error("組合優化失敗");
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!result) return;
+    try {
+      const share = await createShareLinkMutation.mutateAsync({
+        backtestId: 0,
+        isPublic: true
+      });
+      setShareToken(share.token);
+      const url = `${window.location.origin}/share/${share.token}`;
+      navigator.clipboard.writeText(url);
+      toast.success("分享連結已複製到剪貼板！");
+    } catch (e) {
+      toast.error("分享失敗");
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -378,34 +491,71 @@ export default function Backtest() {
               <p className="text-sm text-slate-500 mt-1">支持單標的與投資組合策略回測</p>
             </div>
           </div>
-          {result && (
+          <div className="flex gap-2">
             <Button
-              onClick={handleSave}
-              disabled={!user}
-              className="rounded-xl bg-teal-600 hover:bg-teal-700"
+              onClick={handleGoalPlan}
+              disabled={isPlanning}
+              variant="outline"
+              className="rounded-xl border-teal-200 text-teal-700 hover:bg-teal-50"
               size="sm"
             >
-              <Save size={14} className="mr-2" />
-              保存結果
+              {isPlanning ? <Loader2 size={14} className="mr-2 animate-spin" /> : <BrainCircuit size={14} className="mr-2" />}
+              智能目標規劃
             </Button>
-          )}
+            {result && (
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleShare}
+                  variant="outline"
+                  className="rounded-xl border-blue-200 text-blue-700 hover:bg-blue-50"
+                  size="sm"
+                >
+                  <Globe size={14} className="mr-2" />
+                  分享結果
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={!user}
+                  className="rounded-xl bg-teal-600 hover:bg-teal-700"
+                  size="sm"
+                >
+                  <Save size={14} className="mr-2" />
+                  保存結果
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm flex gap-2">
-          <Button
-            variant={mode === "single" ? "default" : "outline"}
-            onClick={() => setMode("single")}
-            className="rounded-lg"
-          >
-            單標的回測
-          </Button>
-          <Button
-            variant={mode === "portfolio" ? "default" : "outline"}
-            onClick={() => setMode("portfolio")}
-            className="rounded-lg"
-          >
-            投資組合回測
-          </Button>
+          <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm flex items-center justify-between">
+          <div className="flex gap-2">
+            <Button
+              variant={mode === "single" ? "default" : "outline"}
+              onClick={() => setMode("single")}
+              className="rounded-lg"
+            >
+              單標的回測
+            </Button>
+            <Button
+              variant={mode === "portfolio" ? "default" : "outline"}
+              onClick={() => setMode("portfolio")}
+              className="rounded-lg"
+            >
+              投資組合回測
+            </Button>
+          </div>
+          {mode === "portfolio" && (
+            <Button
+              onClick={handleOptimizePortfolio}
+              disabled={isOptimizing || portfolio.length < 2}
+              variant="outline"
+              className="rounded-lg border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              size="sm"
+            >
+              {isOptimizing ? <Loader2 size={14} className="mr-2 animate-spin" /> : <TrendingUp size={14} className="mr-2" />}
+              優化組合權重
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -504,6 +654,19 @@ export default function Backtest() {
                     />
                   </div>
                 ))}
+                
+                {strategy !== "custom" && (
+                  <Button
+                    onClick={handleOptimizeParams}
+                    disabled={isOptimizing}
+                    variant="outline"
+                    className="w-full rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50 mt-4"
+                    size="sm"
+                  >
+                    {isOptimizing ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Zap size={14} className="mr-2" />}
+                    自動優化參數
+                  </Button>
+                )}
               </div>
 
               <div className="space-y-5 pt-6 border-t border-slate-50">
@@ -774,7 +937,17 @@ export default function Backtest() {
             )}
 
             {result && (
-              <AiDiagnosisPanel ticker={mode === "single" ? ticker : result.portfolio?.[0]?.ticker || "AAPL"} />
+              <AiDiagnosisPanel 
+                ticker={mode === "single" ? ticker : undefined} 
+                portfolioData={mode === "portfolio" ? {
+                  assets: result.portfolio,
+                  performance: {
+                    annualizedReturn: result.annualizedReturn,
+                    maxDrawdown: result.maxDrawdown,
+                    sharpeRatio: result.sharpeRatio
+                  }
+                } : undefined}
+              />
             )}
           </div>
         </div>

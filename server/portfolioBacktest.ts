@@ -80,7 +80,14 @@ export async function runPortfolioBacktest(
     input.endDate
   );
 
-  // 4. 計算組合績效指標
+  // 4. 計算買入持有曲線（用於對比）
+  const buyHoldCurve = calculateBuyAndHoldCurve(
+    assetResults,
+    input.portfolio,
+    input.initialCapital
+  );
+
+  // 5. 計算組合績效指標
   const finalEquity = combinedEquityCurve[combinedEquityCurve.length - 1]?.value || input.initialCapital;
   const totalReturn = (finalEquity - input.initialCapital) / input.initialCapital;
   const days = combinedEquityCurve.length || 1;
@@ -154,7 +161,7 @@ export async function runPortfolioBacktest(
     combinedEquityCurve,
     combinedTrades,
     equityCurve: combinedEquityCurve,
-    buyAndHoldCurve: undefined,
+    buyAndHoldCurve: buyHoldCurve,
     trades: combinedTrades,
   };
 }

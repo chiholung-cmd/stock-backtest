@@ -13,6 +13,9 @@ import { runBacktest } from "./backtest";
 import { runPortfolioBacktest } from "./portfolioBacktest";
 import { PoeApiWrapper } from "./poe";
 import { parseNaturalLanguageStrategy, optimizeStrategyParameters, generateStrategyRecommendations } from "./strategyOptimizer";
+import { generatePlan, calculateRequiredContribution } from "./goalPlanner";
+import { optimizeWithGA, optimizeWithGridSearch, optimizeWeights, calculateEfficientFrontier } from "./optimizers";
+import { createShareLink, validateShareLink, addComment, getComments, forkBacktest, getPublicLeaderboard } from "./sharingService";
 
 const poe = new PoeApiWrapper(process.env.POE_API_KEY || "");
 
@@ -69,15 +72,66 @@ export const appRouter = router({
         const response = await poe.chat(lastMessage, input.model, input.messages.slice(0, -1));
         return { reply: response };
       }),
-    diagnose: publicProcedure // ✅ 改為公共，解決登入問題導致的 AI 診斷失敗
+    diagnose: publicProcedure
       .input(z.object({
-        ticker: z.string().min(1),
+        ticker: z.string().optional(),
+        portfolioData: z.any().optional(),
         model: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
-        const result = await poe.diagnoseStock(input.ticker, input.model);
+        const result = await poe.diagnoseStock(input.ticker || "", input.model, input.portfolioData);
         return { diagnosis: result };
       }),
+    goalPlanning: router({
+      generatePlan: publicProcedure
+        .input(z.object({
+          targetAnnualReturn: z.number(),
+          monthlyContribution: z.number(),
+          investmentPeriod: z.number(),
+          initialCapital: z.number(),
+          riskTolerance: z.enum(["low", "moderate", "high"]),
+          startDate: z.string(),
+          endDate: z.string(),
+        }))
+        .mutation(async ({ input }) => {
+          return generatePlan(input);
+        }),
+    }),
+    strategyOptimization: router({
+      optimizeWithGA: publicProcedure
+        .input(z.object({
+          ticker: z.string(),
+          strategy: z.string(),
+          paramRanges: z.record(z.string(), z.tuple([z.number(), z.number()])),
+          startDate: z.string(),
+          endDate: z.string(),
+        }))
+        .mutation(async ({ input }) => {
+          return optimizeWithGA(input);
+        }),
+    }),
+    portfolioOptimization: router({
+      optimizeWeights: publicProcedure
+        .input(z.object({
+          tickers: z.array(z.string()),
+          expectedReturns: z.record(z.string(), z.number()),
+          volatilities: z.record(z.string(), z.number()),
+          correlation: z.record(z.string(), z.record(z.string(), z.number())),
+        }))
+        .mutation(async ({ input }) => {
+          return optimizeWeights(input);
+        }),
+    }),
+    sharing: router({
+      createShareLink: publicProcedure
+        .input(z.object({
+          backtestId: z.number(),
+          isPublic: z.boolean().default(true),
+        }))
+        .mutation(async ({ input }) => {
+          return createShareLink(input.backtestId, input.isPublic);
+        }),
+    }),
     parseStrategy: publicProcedure
       .input(z.object({
         description: z.string().min(1),

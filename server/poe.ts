@@ -31,41 +31,49 @@ export class PoeApiWrapper {
    * 使用 AI 進行情緒分析與診斷（短中長期三維度）
    * 修復：添加錯誤處理、超時控制、模型驗證
    */
-  public async diagnoseStock(ticker: string, model: string = "gpt-4o-mini") {
+  public async diagnoseStock(ticker: string, model: string = "gpt-4o-mini", portfolioData?: any) {
     try {
       // 驗證 ticker
-      if (!ticker || typeof ticker !== 'string') {
-        throw new Error("Invalid ticker provided");
+      if (!ticker && !portfolioData) {
+        throw new Error("Invalid ticker or portfolio data provided");
       }
-      const news = await this.getStockNews(ticker);
-      const newsContext = news && news.length > 0 
-        ? news.map((n: any) => `- ${n.title} (${n.publisher})`).join("\n")
-        : "暫無最新新聞";
-      const prompt = `
-你是一位專業的金融分析師。請針對股票代碼 "${ticker}" 進行深度診斷。
-以下是該股票的最新新聞：
-${newsContext}
 
-請分別從三個時間維度進行分析：
+      let newsContext = "暫無最新新聞";
+      if (ticker) {
+        const news = await this.getStockNews(ticker);
+        newsContext = news && news.length > 0 
+          ? news.map((n: any) => `- ${n.title} (${n.publisher})`).join("\n")
+          : "暫無最新新聞";
+      }
+
+      const isPortfolio = !!portfolioData;
+      const targetName = isPortfolio ? "投資組合整體" : `股票代碼 "${ticker}"`;
+
+      const prompt = `
+你是一位極其嚴苛、毒舌且專業的對沖基金分析師。請針對 ${targetName} 進行深度診斷。
+${isPortfolio ? `投資組合數據：${JSON.stringify(portfolioData)}` : `以下是該股票的最新新聞：\n${newsContext}`}
+
+請以批判性的視角，分別從三個時間維度進行分析。記住：你的目標是找出潛在風險，不要輕易建議「持有」或「買入」，除非數據極其完美。
 
 ## 短期展望（1-3 個月）
-- 技術面分析（近期價格走勢、成交量、技術指標）
-- 近期新聞對股價的影響
-- 短期催化劑或風險因素
+- 技術面分析（是否存在超買、頂部背離、成交量萎縮等風險）
+- 近期負面新聞或市場情緒的殺傷力分析
+- 短期崩盤或回撤的觸發因素
 
 ## 中期展望（3-12 個月）
-- 基本面分析（營收、獲利、估值）
-- 行業趨勢與競爭格局
-- 中期成長動能
+- 基本面分析（營收增速放緩、利潤率壓縮、估值過高等硬傷）
+- 行業週期性風險或競爭對手的威脅
+- 宏觀環境（利率、通膨）對該資產的負面衝擊
 
 ## 長期展望（1 年以上）
-- 公司核心競爭力與護城河
-- 長期市場前景與戰略佈局
-- 長期投資價值評估
+- 核心競爭力是否正在被侵蝕？護城河是否變窄？
+- 長期結構性衰退的風險評估
+- 替代技術或商業模式帶來的毀滅性打擊
 
-## 綜合投資建議
-- 整體投資建議（買入 / 持有 / 賣出）
-- 核心風險提示
+## 綜合投資建議（必須明確：買入 / 持有 / 賣出）
+- 如果資產表現平平或存在明顯隱憂，請果斷建議「賣出」或「減碼」。
+- 嚴禁模糊地建議「持有」，除非有極強的抗跌理由。
+- 核心風險提示（請列出最致命的 3 點）
 
 請以繁體中文回答，並在最後附上一個 JSON 代碼塊，格式如下：
 \`\`\`json
@@ -76,10 +84,10 @@ ${newsContext}
   "longTermScore": number,
   "sentiment": "悲觀" | "中立" | "樂觀",
   "recommendation": "買入" | "持有" | "賣出",
-  "summary": "一句話總結"
+  "summary": "一句話總結（需具備批判性）"
 }
 \`\`\`
-其中 score 為整體評分，shortTermScore、midTermScore、longTermScore 分別為短中長期評分，均為 -100 到 +100 的整數。
+其中 score 為整體評分，shortTermScore、midTermScore、longTermScore 分別為短中長期評分，均為 -100 到 +100 的整數。評分低於 0 代表存在顯著風險。
 `;
       const result = await invokeLLM({
         messages: [{ role: "user", content: prompt }],

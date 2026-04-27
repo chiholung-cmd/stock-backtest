@@ -20,7 +20,8 @@ import ReactMarkdown from "react-markdown";
 import { Components } from "react-markdown";
 
 interface AiDiagnosisPanelProps {
-  ticker: string;
+  ticker?: string;
+  portfolioData?: any;
 }
 
 interface StructuredData {
@@ -78,27 +79,32 @@ function ScoreCard({
   );
 }
 
-export function AiDiagnosisPanel({ ticker }: AiDiagnosisPanelProps) {
+export function AiDiagnosisPanel({ ticker, portfolioData }: AiDiagnosisPanelProps) {
   const [diagnosis, setDiagnosis] = useState<string | null>(null);
   const [structuredData, setStructuredData] = useState<StructuredData | null>(null);
   const [loading, setLoading] = useState(false);
-  const lastTickerRef = useRef<string>("");
+  const lastInputRef = useRef<string>("");
 
   const diagnoseMutation = trpc.ai.diagnose.useMutation();
 
   const handleDiagnose = async (force = false) => {
-    if (!ticker) return;
+    if (!ticker && !portfolioData) return;
     
-    // 如果 ticker 沒變且不是強制刷新，且已經有診斷結果，就不重複分析
-    if (!force && ticker === lastTickerRef.current && diagnosis) {
+    const currentInput = ticker || JSON.stringify(portfolioData);
+    
+    // 如果輸入沒變且不是強制刷新，且已經有診斷結果，就不重複分析
+    if (!force && currentInput === lastInputRef.current && diagnosis) {
       return;
     }
 
     setLoading(true);
     try {
-      const result = await diagnoseMutation.mutateAsync({ ticker });
+      const result = await diagnoseMutation.mutateAsync({ 
+        ticker, 
+        portfolioData 
+      });
       setDiagnosis(result.diagnosis);
-      lastTickerRef.current = ticker;
+      lastInputRef.current = currentInput;
       
       // 嘗試解析 JSON
       const match = result.diagnosis.match(/```json\n([\s\S]*?)\n```/);
@@ -120,7 +126,7 @@ export function AiDiagnosisPanel({ ticker }: AiDiagnosisPanelProps) {
 
   useEffect(() => {
     handleDiagnose();
-  }, [ticker]);
+  }, [ticker, portfolioData]);
 
   if (loading) {
     return (
