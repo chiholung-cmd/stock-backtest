@@ -82,7 +82,7 @@ export const STRATEGIES: StrategyDefinition[] = [
   {
     id: "predator_mf",
     name: "Predator MF (TQQQ 優化)",
-    description: "結合 SMA50/200 趨勢、RSI30 超賣與 15% 止損的進階策略",
+    description: "結合 SMA50/200 趨勢、RSI30 超賣、15% 止損與熊市加碼囤彈的進階策略",
     color: "#f43f5e",
     params: [
       { key: "smaFast", label: "快線 SMA (進場)", min: 10, max: 100, default: 50, step: 1 },
@@ -90,6 +90,8 @@ export const STRATEGIES: StrategyDefinition[] = [
       { key: "rsiPeriod", label: "RSI 週期", min: 2, max: 50, default: 14, step: 1 },
       { key: "rsiOversold", label: "RSI 超賣閾值", min: 10, max: 50, default: 30, step: 1 },
       { key: "stopLoss", label: "硬止損 %", min: 5, max: 30, default: 15, step: 1 },
+      { key: "monthlyDCA", label: "月供 (牛市) HKD", min: 1000, max: 10000, default: 3000, step: 500 },
+      { key: "bearMarketDCA", label: "月供 (熊市) HKD", min: 3000, max: 20000, default: 6000, step: 500 },
     ],
   },
 ];
