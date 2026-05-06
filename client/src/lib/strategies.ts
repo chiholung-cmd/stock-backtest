@@ -1,4 +1,4 @@
-export type Strategy = "ma_crossover" | "rsi" | "macd" | "bollinger_bands" | "kd" | "breakout" | "custom";
+export type Strategy = "ma_crossover" | "rsi" | "macd" | "bollinger_bands" | "kd" | "breakout" | "custom" | "predator_mf";
 
 export interface StrategyParam {
   key: string;
@@ -77,6 +77,19 @@ export const STRATEGIES: StrategyDefinition[] = [
     params: [
       { key: "period", label: "均線週期", min: 5, max: 100, default: 20, step: 1 },
       { key: "stdDev", label: "標準差倍數", min: 0.5, max: 4, default: 2, step: 0.1 },
+    ],
+  },
+  {
+    id: "predator_mf",
+    name: "Predator MF (TQQQ 優化)",
+    description: "結合 SMA50/200 趨勢、RSI30 超賣與 15% 止損的進階策略",
+    color: "#f43f5e",
+    params: [
+      { key: "smaFast", label: "快線 SMA (進場)", min: 10, max: 100, default: 50, step: 1 },
+      { key: "smaSlow", label: "慢線 SMA (離場)", min: 50, max: 300, default: 200, step: 1 },
+      { key: "rsiPeriod", label: "RSI 週期", min: 2, max: 50, default: 14, step: 1 },
+      { key: "rsiOversold", label: "RSI 超賣閾值", min: 10, max: 50, default: 30, step: 1 },
+      { key: "stopLoss", label: "硬止損 %", min: 5, max: 30, default: 15, step: 1 },
     ],
   },
 ];

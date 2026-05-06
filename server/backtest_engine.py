@@ -290,6 +290,61 @@ def strategy_breakout(df: pd.DataFrame, params: dict):
     return df, signals
 
 
+# ─── Strategy: Predator MF (TQQQ Optimized) ──────────────────────────────────
+
+def strategy_predator_mf(df: pd.DataFrame, params: dict):
+    sma_fast_len = int(params.get("smaFast", 50))
+    sma_slow_len = int(params.get("smaSlow", 200))
+    rsi_len = int(params.get("rsiPeriod", 14))
+    rsi_oversold = float(params.get("rsiOversold", 30))
+    stop_loss_pct = float(params.get("stopLoss", 15.0)) / 100.0
+    
+    df = df.copy()
+    df["sma_fast"] = df["Close"].rolling(sma_fast_len).mean()
+    df["sma_slow"] = df["Close"].rolling(sma_slow_len).mean()
+    
+    # Calculate RSI
+    delta = df["Close"].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.rolling(rsi_len).mean()
+    avg_loss = loss.rolling(rsi_len).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    df["rsi"] = 100 - (100 / (1 + rs))
+    
+    df = df.dropna()
+    
+    signals = pd.Series(0, index=df.index)
+    position = 0
+    entry_price = 0.0
+    
+    for i in range(len(df)):
+        date = df.index[i]
+        price = df["Close"].iloc[i]
+        sma_fast = df["sma_fast"].iloc[i]
+        sma_slow = df["sma_slow"].iloc[i]
+        rsi = df["rsi"].iloc[i]
+        
+        if position == 0:
+            # Buy logic: Price > SMA50 OR RSI < 30
+            if price > sma_fast or rsi < rsi_oversold:
+                signals.iloc[i] = 1
+                position = 1
+                entry_price = price
+        else:
+            # Sell logic:
+            # 1. Hard Stop Loss
+            if price <= entry_price * (1 - stop_loss_pct):
+                signals.iloc[i] = -1
+                position = 0
+            # 2. Trend Exit: Price < SMA200
+            elif price < sma_slow:
+                signals.iloc[i] = -1
+                position = 0
+                
+    return df, signals
+
+
 # ─── Main Entry Point ─────────────────────────────────────────────────────────
 
 STRATEGIES = {
@@ -299,6 +354,7 @@ STRATEGIES = {
     "bollinger_bands": strategy_bollinger_bands,
     "kd": strategy_kd,
     "breakout": strategy_breakout,
+    "predator_mf": strategy_predator_mf,
 }
 
 
