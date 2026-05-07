@@ -38,9 +38,9 @@ export function getSessionCookieOptions(
   const secure = process.env.NODE_ENV === "production" ? true : isSecure;
   
   // sameSite 設置：
-  // - 生產環境：使用 "none" 以支持跨域（需要 secure: true）
-  // - 開發環境：使用 "lax" 以支持本地測試
-  const sameSite = process.env.NODE_ENV === "production" ? "none" : "lax";
+  // - 安全請求/生產環境：使用 "none" 以支持跨域（需要 secure: true）
+  // - 非安全本地開發：使用 "lax" 以支持本地 HTTP 測試
+  const sameSite = secure ? "none" : "lax";
 
   return {
     httpOnly: true,
