@@ -260,10 +260,10 @@ export default function Backtest() {
   const [isPlanning, setIsPlanning] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
 
-  const generatePlanMutation = trpc.goalPlanning.generatePlan.useMutation();
-  const optimizeMutation = trpc.strategyOptimization.optimizeWithGA.useMutation();
-  const optimizePortfolioMutation = trpc.portfolioOptimization.optimizeWeights.useMutation();
-  const createShareLinkMutation = trpc.sharing.createShareLink.useMutation();
+  const generatePlanMutation = trpc.ai.goalPlanning.generatePlan.useMutation();
+  const optimizeMutation = trpc.ai.strategyOptimization.optimizeWithGA.useMutation();
+  const optimizePortfolioMutation = trpc.ai.portfolioOptimization.optimizeWeights.useMutation();
+  const createShareLinkMutation = trpc.ai.sharing.createShareLink.useMutation();
 
   const selectedStrategy = STRATEGIES.find(s => s.id === strategy);
 
@@ -283,7 +283,7 @@ export default function Backtest() {
         const best = plans[0];
         if (best.portfolioComposition) {
           setMode("portfolio");
-          setPortfolio(best.portfolioComposition.map(a => ({ ticker: a.ticker, weight: a.weight * 100 })));
+          setPortfolio(best.portfolioComposition.map((a) => ({ ticker: a.ticker, weight: a.weight * 100 })));
         }
         setStrategy(best.strategy.id as Strategy);
         setParams(best.strategy.params);
@@ -655,18 +655,16 @@ export default function Backtest() {
                   </div>
                 ))}
                 
-                {strategy !== "custom" && (
-                  <Button
-                    onClick={handleOptimizeParams}
-                    disabled={isOptimizing}
-                    variant="outline"
-                    className="w-full rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50 mt-4"
-                    size="sm"
-                  >
-                    {isOptimizing ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Zap size={14} className="mr-2" />}
-                    自動優化參數
-                  </Button>
-                )}
+                <Button
+                  onClick={handleOptimizeParams}
+                  disabled={isOptimizing}
+                  variant="outline"
+                  className="w-full rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50 mt-4"
+                  size="sm"
+                >
+                  {isOptimizing ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Zap size={14} className="mr-2" />}
+                  自動優化參數
+                </Button>
               </div>
 
               <div className="space-y-5 pt-6 border-t border-slate-50">
