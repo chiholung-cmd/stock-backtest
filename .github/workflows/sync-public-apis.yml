@@ -1,0 +1,45 @@
+name: Sync public-apis collection
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run daily at 03:00 UTC
+    - cron: "0 3 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Clone upstream public-apis repository
+        run: |
+          rm -rf /tmp/public-apis
+          git clone --depth 1 https://github.com/public-apis/public-apis.git /tmp/public-apis
+
+      - name: Sync upstream files into vendor/public-apis
+        run: |
+          mkdir -p vendor/public-apis
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github/workflows' \
+            /tmp/public-apis/ vendor/public-apis/
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vendor/public-apis
+          if git diff --cached --quiet; then
+            echo "No upstream changes to sync."
+          else
+            git commit -m "chore: sync public-apis collection"
+            git push
+          fi
